@@ -1,0 +1,6 @@
+{
+  "name": "The Big 3 | הטופ 3",
+  "description": "אפליקציית ניהול משימות ומיקוד יומי מבוססת עקרון 3 המשימות, מעבדת פירוק משימות חכמה וטקס תכנון ערב.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

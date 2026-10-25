@@ -1,0 +1,160 @@
+{
+  "entities": {
+    "TodayTask": {
+      "title": "TodayTask",
+      "description": "Daily Big 3 priority task",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the owner user"
+        },
+        "title": {
+          "type": "string",
+          "description": "Task description",
+          "maxLength": 300
+        },
+        "completed": {
+          "type": "boolean",
+          "description": "Whether the task is checked off"
+        },
+        "completedAt": {
+          "type": "string",
+          "description": "ISO timestamp of completion"
+        },
+        "priorityIndex": {
+          "type": "number",
+          "description": "Priority rank: 1, 2, or 3"
+        },
+        "estimatedMinutes": {
+          "type": "number",
+          "description": "Estimated duration in minutes"
+        },
+        "date": {
+          "type": "string",
+          "description": "Day date string YYYY-MM-DD"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp when created"
+        }
+      },
+      "required": ["userId", "title", "completed", "priorityIndex", "date", "createdAt"]
+    },
+    "InboxItem": {
+      "title": "InboxItem",
+      "description": "Raw captured backlog idea or large task awaiting decomposition",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the owner user"
+        },
+        "title": {
+          "type": "string",
+          "description": "Raw task or idea title",
+          "maxLength": 300
+        },
+        "note": {
+          "type": "string",
+          "description": "Optional additional context",
+          "maxLength": 1000
+        },
+        "decomposed": {
+          "type": "boolean",
+          "description": "Whether the task has been decomposed into micro-steps"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["userId", "title", "decomposed", "createdAt"]
+    },
+    "MicroTask": {
+      "title": "MicroTask",
+      "description": "Decomposed 15-30 minute actionable micro-task",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the owner user"
+        },
+        "inboxItemId": {
+          "type": "string",
+          "description": "ID of parent inbox item if applicable"
+        },
+        "inboxItemTitle": {
+          "type": "string",
+          "description": "Title of parent inbox item"
+        },
+        "title": {
+          "type": "string",
+          "description": "Actionable step title",
+          "maxLength": 300
+        },
+        "estimatedMinutes": {
+          "type": "number",
+          "description": "Estimated minutes 15-30"
+        },
+        "scheduledFor": {
+          "type": "string",
+          "description": "Scheduling status: today, tomorrow, or pool",
+          "enum": ["today", "tomorrow", "pool"]
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp"
+        }
+      },
+      "required": ["userId", "title", "estimatedMinutes", "createdAt"]
+    },
+    "BrainstormSession": {
+      "title": "BrainstormSession",
+      "description": "AI Brainstorming and voice dump session",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "UID of the owner user"
+        },
+        "title": {
+          "type": "string",
+          "description": "Session topic or headline",
+          "maxLength": 300
+        },
+        "messages": {
+          "type": "array",
+          "description": "Dialogue messages"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp"
+        }
+      },
+      "required": ["userId", "title", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/todayTasks/{taskId}": {
+      "schema": "TodayTask",
+      "description": "Active and completed Big 3 tasks for the user"
+    },
+    "/inbox/{inboxId}": {
+      "schema": "InboxItem",
+      "description": "Inbox backlog items for the user"
+    },
+    "/microTasks/{microTaskId}": {
+      "schema": "MicroTask",
+      "description": "Decomposed micro-tasks available for scheduling"
+    },
+    "/brainstorms/{sessionId}": {
+      "schema": "BrainstormSession",
+      "description": "Brainstorming chat logs and thought dumps"
+    }
+  }
+}
