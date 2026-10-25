@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
-import { Home, Target, Inbox, Layers, Sparkles, Plus } from 'lucide-react';
+import { Home, Target, Inbox, Layers, Sparkles, Plus, Fingerprint } from 'lucide-react';
 import { ActiveScreen } from '../types';
 import { sound } from '../utils/audio';
 import { KosunIconButton } from './KosunIconButton';
+import { KosunAiAvatarButton } from './KosunAiAvatarButton';
 
 interface BottomNavProps {
   activeScreen: ActiveScreen;
   onSelectScreen: (screen: ActiveScreen) => void;
   onOpenQuickCapture: () => void;
+  onOpenAiAssistant?: () => void;
   inboxCount: number;
 }
 
@@ -15,6 +16,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   activeScreen,
   onSelectScreen,
   onOpenQuickCapture,
+  onOpenAiAssistant,
   inboxCount,
 }) => {
   const tabs = [
@@ -33,6 +35,11 @@ export const BottomNav: React.FC<BottomNavProps> = ({
       label: 'תיק נכסים',
       icon: Inbox,
       badge: inboxCount > 0 ? inboxCount : undefined,
+    },
+    {
+      id: 'branding' as ActiveScreen,
+      label: 'מרכז מיתוג DNA',
+      icon: Fingerprint,
     },
     {
       id: 'brainstorm' as ActiveScreen,
@@ -54,6 +61,21 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           <div className="flex-1 flex items-center justify-around">
             {tabs.map((tab) => {
               const isActive = activeScreen === tab.id;
+
+              if (tab.id === 'brainstorm') {
+                return (
+                  <div key={tab.id} className="relative flex items-center justify-center">
+                    <KosunAiAvatarButton
+                      size="sm"
+                      onClick={() => {
+                        if (onOpenAiAssistant) onOpenAiAssistant();
+                        else onSelectScreen('brainstorm');
+                      }}
+                      tooltipText="עוזר AI חכם וחיפוש פעולות"
+                    />
+                  </div>
+                );
+              }
 
               return (
                 <KosunIconButton

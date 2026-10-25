@@ -50,7 +50,7 @@ export interface BrainstormSession {
   updatedAt?: string;
 }
 
-export type ActiveScreen = 'home' | 'today' | 'inbox' | 'decompose' | 'brainstorm' | 'ritual';
+export type ActiveScreen = 'home' | 'today' | 'inbox' | 'decompose' | 'brainstorm' | 'ritual' | 'branding';
 
 export interface AppState {
   todayTasks: Task[];

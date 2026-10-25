@@ -19,6 +19,10 @@ import { QuickCaptureModal } from './components/QuickCaptureModal';
 import { RuleOf3WarningModal } from './components/RuleOf3WarningModal';
 import { InstallAppModal } from './components/InstallAppModal';
 import { AuthScreen } from './components/AuthScreen';
+import { BrandDnaScreen } from './components/BrandDnaScreen';
+import { BrandProvider } from './context/BrandContext';
+import { KosunAiAssistantModal } from './components/KosunAiAssistantModal';
+import { KosunAiAvatarButton } from './components/KosunAiAvatarButton';
 import { ActiveScreen, InboxItem, Task } from './types';
 import { Loader2 } from 'lucide-react';
 
@@ -51,6 +55,7 @@ function MainApp() {
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isEveningRitualOpen, setIsEveningRitualOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
   const [selectedInboxForDecompose, setSelectedInboxForDecompose] = useState<InboxItem | null>(null);
 
   if (authLoading) {
@@ -98,7 +103,15 @@ function MainApp() {
       )}
 
       {/* Main Content Area */}
-      <main className={activeScreen === 'home' ? 'w-full' : 'max-w-2xl mx-auto px-4 pt-4 pb-24'}>
+      <main
+        className={
+          activeScreen === 'home'
+            ? 'w-full'
+            : activeScreen === 'branding'
+            ? 'w-full max-w-xl mx-auto px-2 sm:px-4 h-[calc(100vh-62px)] overflow-hidden'
+            : 'max-w-2xl mx-auto px-4 pt-4 pb-24'
+        }
+      >
         {tasksLoading ? (
           <div className="py-24 flex flex-col items-center justify-center text-[#F0F4FF]/60">
             <Loader2 className="w-8 h-8 animate-spin mb-3 text-[#00F0FF]" />
@@ -113,10 +126,16 @@ function MainApp() {
                 onNavigateToToday={() => setActiveScreen('today')}
                 onNavigateToInbox={() => setActiveScreen('inbox')}
                 onNavigateToRitual={() => setIsEveningRitualOpen(true)}
-                onOpenBrainstorm={() => setActiveScreen('brainstorm')}
+                onNavigateToBranding={() => setActiveScreen('branding')}
+                onOpenBrainstorm={() => setIsAiAssistantOpen(true)}
+                onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
                 onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
                 onOpenInstallModal={() => setIsInstallModalOpen(true)}
               />
+            )}
+
+            {activeScreen === 'branding' && (
+              <BrandDnaScreen onNavigateHome={() => setActiveScreen('home')} />
             )}
 
             {activeScreen === 'today' && (
@@ -248,12 +267,51 @@ function MainApp() {
         onClose={() => setIsInstallModalOpen(false)}
       />
 
-      {/* Bottom Navigation with Floating Action Button (shown when not on home or everywhere for fluid navigation) */}
+      {/* Universal Dynamic AI Assistant Modal (Vector search, 4 dynamic recommendations & task navigation) */}
+      <KosunAiAssistantModal
+        isOpen={isAiAssistantOpen}
+        onClose={() => setIsAiAssistantOpen(false)}
+        currentScreen={activeScreen}
+        onNavigateScreen={(screen) => {
+          setActiveScreen(screen);
+          setIsAiAssistantOpen(false);
+        }}
+        onTriggerAction={(action) => {
+          setIsAiAssistantOpen(false);
+          if (action === 'quick_capture') {
+            setIsQuickCaptureOpen(true);
+          } else if (action === 'evening_ritual') {
+            setIsEveningRitualOpen(true);
+          } else if (action === 'install') {
+            setIsInstallModalOpen(true);
+          }
+        }}
+      />
+
+      {/* Floating KOSUN AI Avatar with Head Bobbing Animation at the Bottom of Every Non-Home Window */}
       {activeScreen !== 'home' && (
+        <div
+          className={`fixed z-40 transition-all duration-300 animate-in fade-in zoom-in-95 ${
+            activeScreen === 'branding'
+              ? 'bottom-4 left-4'
+              : 'bottom-20 left-4 sm:bottom-6 sm:left-6'
+          }`}
+        >
+          <KosunAiAvatarButton
+            onClick={() => setIsAiAssistantOpen(true)}
+            size="md"
+            tooltipText="עוזר AI חכם וחיפוש פעולות"
+          />
+        </div>
+      )}
+
+      {/* Bottom Navigation with Floating Action Button (hidden on branding to guarantee zero-scroll) */}
+      {activeScreen !== 'home' && activeScreen !== 'branding' && (
         <BottomNav
           activeScreen={activeScreen}
           onSelectScreen={(screen) => setActiveScreen(screen)}
           onOpenQuickCapture={() => setIsQuickCaptureOpen(true)}
+          onOpenAiAssistant={() => setIsAiAssistantOpen(true)}
           inboxCount={inbox.filter((i) => !i.decomposed).length}
         />
       )}
@@ -265,9 +323,11 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <TaskProvider>
-          <MainApp />
-        </TaskProvider>
+        <BrandProvider>
+          <TaskProvider>
+            <MainApp />
+          </TaskProvider>
+        </BrandProvider>
       </AuthProvider>
     </ThemeProvider>
   );

@@ -94,5 +94,11 @@ service cloud.firestore {
       allow update: if isSignedIn() && existing().userId == request.auth.uid && isValidBrainstorm(incoming()) && incoming().userId == existing().userId;
       allow delete: if isSignedIn() && existing().userId == request.auth.uid;
     }
+
+    match /brandDna/{userId} {
+      allow get, list: if isSignedIn() && request.auth.uid == userId;
+      allow create, update: if isSignedIn() && request.auth.uid == userId;
+      allow delete: if isSignedIn() && request.auth.uid == userId;
+    }
   }
 }
