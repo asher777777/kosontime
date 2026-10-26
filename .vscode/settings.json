@@ -1,0 +1,6 @@
+{
+    "files.autoSave": "onFocusChange",
+    "editor.wordWrap": "on",
+    "explorer.compactFolders": false,
+    "scm.compactFolders": false
+}

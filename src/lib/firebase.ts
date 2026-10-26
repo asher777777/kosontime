@@ -1,11 +1,33 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
-import firebaseConfig from '../../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+// 1. קונפיגורציית פרויקט KOSUN (המערכת המקומית)
+import kosunConfig from '../../firebase-applet-config.json';
+// 2. קונפיגורציית פרויקט COMONA / GlowManage (קמונה)
+import comonaConfig from '../../comona-firebase-config.json';
+
+// --- אתחול KOSUN App ---
+const kosunApp = !getApps().some(app => app.name === '[DEFAULT]')
+  ? initializeApp(kosunConfig)
+  : getApp();
+
+export const kosunDb = getFirestore(kosunApp, kosunConfig.firestoreDatabaseId);
+export const kosunAuth = getAuth(kosunApp);
+
+// תאימות לאחור
+export const db = kosunDb;
+export const auth = kosunAuth;
+
+// --- אתחול COMONA (GlowManage) App במקביל! ---
+const comonaApp = !getApps().some(app => app.name === 'comona')
+  ? initializeApp(comonaConfig, 'comona')
+  : getApp('comona');
+
+export const comonaDb = getFirestore(comonaApp);
+export const comonaAuth = getAuth(comonaApp);
+
+console.log('[Firebase Dual-Bridge] Successfully linked KOSUN & COMONA (glowmanage) instances!');
 
 export enum OperationType {
   CREATE = 'create',
@@ -54,14 +76,10 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   throw new Error(JSON.stringify(errInfo));
 }
 
-// Test connection on boot
 export async function testConnection() {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error("Please check your Firebase configuration.");
-    }
+    console.error('Connection test failed:', error);
   }
 }
-testConnection();

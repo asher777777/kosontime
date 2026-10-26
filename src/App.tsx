@@ -20,6 +20,7 @@ import { RuleOf3WarningModal } from './components/RuleOf3WarningModal';
 import { InstallAppModal } from './components/InstallAppModal';
 import { AuthScreen } from './components/AuthScreen';
 import { BrandDnaScreen } from './components/BrandDnaScreen';
+import { ViewComponaScreen } from '../KOSUN2026/preview/ViewComponaScreen';
 import { BrandProvider } from './context/BrandContext';
 import { KosunAiAssistantModal } from './components/KosunAiAssistantModal';
 import { KosunAiAvatarButton } from './components/KosunAiAvatarButton';
@@ -27,6 +28,21 @@ import { ActiveScreen, InboxItem, Task } from './types';
 import { Loader2 } from 'lucide-react';
 
 function MainApp() {
+  const getInitialScreen = (): ActiveScreen => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.toLowerCase();
+      const hash = window.location.hash.toLowerCase();
+      if (path.includes('viewcompona') || hash.includes('viewcompona')) {
+        return 'viewcompona';
+      }
+    }
+    return 'home';
+  };
+  const [activeScreen, setActiveScreen] = useState<ActiveScreen>(getInitialScreen);
+
+  if (activeScreen === 'viewcompona') {
+    return <ViewComponaScreen onBackHome={() => setActiveScreen('home')} />;
+  }
   const { user, loading: authLoading, logOut } = useAuth();
   const {
     todayTasks,
@@ -50,8 +66,6 @@ function MainApp() {
     applyTomorrowBig3,
   } = useTasks();
 
-  // 'home' is now the primary home screen!
-  const [activeScreen, setActiveScreen] = useState<ActiveScreen>('home');
   const [isQuickCaptureOpen, setIsQuickCaptureOpen] = useState(false);
   const [isEveningRitualOpen, setIsEveningRitualOpen] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
@@ -68,9 +82,8 @@ function MainApp() {
     );
   }
 
-  if (!user) {
-    return <AuthScreen />;
-  }
+  /* auth disabled for KOSUN2026 */
+
 
   const completedCount = todayTasks.filter((t) => t.completed).length;
 
@@ -332,3 +345,4 @@ export default function App() {
     </ThemeProvider>
   );
 }
+

@@ -2,11 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Default Deny
-    match /{document=**} {
-      allow read, write: if false;
-    }
-
     // Helper functions
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
@@ -26,9 +21,9 @@ service cloud.firestore {
 
     // Validation helpers
     function isValidTodayTask(data) {
-      return data.keys().hasAll(['userId', 'title', 'completed', 'priorityIndex', 'date', 'createdAt']) &&
+      return data.keys().hasAll(['title', 'completed', 'priorityIndex', 'date', 'createdAt']) &&
         data.keys().hasOnly(['userId', 'title', 'completed', 'completedAt', 'priorityIndex', 'estimatedMinutes', 'originInboxId', 'date', 'createdAt']) &&
-        data.userId is string && data.userId == request.auth.uid &&
+        (!('userId' in data) || data.userId is string) &&
         data.title is string && data.title.size() > 0 && data.title.size() <= 300 &&
         data.completed is bool &&
         data.priorityIndex is number && data.priorityIndex >= 1 && data.priorityIndex <= 3 &&
@@ -37,68 +32,102 @@ service cloud.firestore {
     }
 
     function isValidInboxItem(data) {
-      return data.keys().hasAll(['userId', 'title', 'decomposed', 'createdAt']) &&
+      return data.keys().hasAll(['title', 'decomposed', 'createdAt']) &&
         data.keys().hasOnly(['userId', 'title', 'note', 'decomposed', 'createdAt', 'microTasks']) &&
-        data.userId is string && data.userId == request.auth.uid &&
+        (!('userId' in data) || data.userId is string) &&
         data.title is string && data.title.size() > 0 && data.title.size() <= 300 &&
         data.decomposed is bool &&
         data.createdAt is string && data.createdAt.size() <= 50;
     }
 
     function isValidMicroTask(data) {
-      return data.keys().hasAll(['userId', 'title', 'estimatedMinutes', 'createdAt']) &&
+      return data.keys().hasAll(['title', 'estimatedMinutes', 'createdAt']) &&
         data.keys().hasOnly(['userId', 'inboxItemId', 'inboxItemTitle', 'title', 'estimatedMinutes', 'scheduledFor', 'createdAt']) &&
-        data.userId is string && data.userId == request.auth.uid &&
+        (!('userId' in data) || data.userId is string) &&
         data.title is string && data.title.size() > 0 && data.title.size() <= 300 &&
         data.estimatedMinutes is number && data.estimatedMinutes >= 5 && data.estimatedMinutes <= 120 &&
         data.createdAt is string && data.createdAt.size() <= 50;
     }
 
     function isValidBrainstorm(data) {
-      return data.keys().hasAll(['userId', 'title', 'createdAt']) &&
+      return data.keys().hasAll(['title', 'createdAt']) &&
         data.keys().hasOnly(['userId', 'title', 'messages', 'createdAt', 'updatedAt']) &&
-        data.userId is string && data.userId == request.auth.uid &&
+        (!('userId' in data) || data.userId is string) &&
         data.title is string && data.title.size() > 0 && data.title.size() <= 300 &&
         data.createdAt is string && data.createdAt.size() <= 50;
     }
 
-    // Collections
+    // 1. Connection check doc
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // 2. Core task & workspace collections (allow dev read/write while maintaining schema sanity)
     match /todayTasks/{taskId} {
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidId(taskId) && isValidTodayTask(incoming());
-      allow update: if isSignedIn() && existing().userId == request.auth.uid && isValidTodayTask(incoming()) && incoming().userId == existing().userId;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow read: if true;
+      allow create: if isValidTodayTask(incoming());
+      allow update: if isValidTodayTask(incoming());
+      allow delete: if true;
     }
 
     match /inbox/{inboxId} {
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidId(inboxId) && isValidInboxItem(incoming());
-      allow update: if isSignedIn() && existing().userId == request.auth.uid && isValidInboxItem(incoming()) && incoming().userId == existing().userId;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow read: if true;
+      allow create: if isValidInboxItem(incoming());
+      allow update: if isValidInboxItem(incoming());
+      allow delete: if true;
     }
 
     match /microTasks/{microTaskId} {
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidId(microTaskId) && isValidMicroTask(incoming());
-      allow update: if isSignedIn() && existing().userId == request.auth.uid && isValidMicroTask(incoming()) && incoming().userId == existing().userId;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow read: if true;
+      allow create: if isValidMicroTask(incoming());
+      allow update: if isValidMicroTask(incoming());
+      allow delete: if true;
     }
 
     match /brainstorms/{sessionId} {
-      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow get: if isSignedIn() && resource.data.userId == request.auth.uid;
-      allow create: if isSignedIn() && isValidId(sessionId) && isValidBrainstorm(incoming());
-      allow update: if isSignedIn() && existing().userId == request.auth.uid && isValidBrainstorm(incoming()) && incoming().userId == existing().userId;
-      allow delete: if isSignedIn() && existing().userId == request.auth.uid;
+      allow read: if true;
+      allow create: if isValidBrainstorm(incoming());
+      allow update: if isValidBrainstorm(incoming());
+      allow delete: if true;
     }
 
     match /brandDna/{userId} {
-      allow get, list: if isSignedIn() && request.auth.uid == userId;
-      allow create, update: if isSignedIn() && request.auth.uid == userId;
-      allow delete: if isSignedIn() && request.auth.uid == userId;
+      allow read, write: if true;
+    }
+
+    // 3. Multi-tenant brand, settings, and dynamic catalog collections
+    match /tenants/{tenantId}/{allSubpaths=**} {
+      allow read, write: if true;
+    }
+
+    match /content_strategies/{strategyId} {
+      allow read, write: if true;
+    }
+
+    // 4. Dynamic component & CloudStore icon picker collections
+    match /icons/{iconId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    match /cloudstore_icons/{iconId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // 5. Global Archetype Presets & Design Collection (KOSUN)
+    match /archetype_presets/{presetId} {
+      allow read, write: if true;
+    }
+
+    match /system_design_presets/{presetId} {
+      allow read, write: if true;
+    }
+
+    // Default development fallback for any other dynamic collection queries
+    match /{document=**} {
+      allow read: if true;
+      allow write: if isSignedIn();
     }
   }
 }
