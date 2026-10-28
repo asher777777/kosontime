@@ -21,6 +21,10 @@ import { InstallAppModal } from './components/InstallAppModal';
 import { AuthScreen } from './components/AuthScreen';
 import { BrandDnaScreen } from './components/BrandDnaScreen';
 import { ViewComponaScreen } from '../KOSUN2026/preview/ViewComponaScreen';
+import { ThemeLabScreen } from '../KOSUN2026/preview/ThemeLabScreen';
+import { Kos26Site } from '../KOSUN2026/Kos26Site';
+import { KosTestSite } from '../KOSUN2026/KosTestSite';
+import { KosWebAiPortalPage } from '../KOSUN2026/pages/KosWebAiPortalPage';
 import { BrandProvider } from './context/BrandContext';
 import { KosunAiAssistantModal } from './components/KosunAiAssistantModal';
 import { KosunAiAvatarButton } from './components/KosunAiAvatarButton';
@@ -32,16 +36,45 @@ function MainApp() {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname.toLowerCase();
       const hash = window.location.hash.toLowerCase();
+      const search = window.location.search.toLowerCase();
+      if (path.includes('themelab') || hash.includes('themelab') || search.includes('themelab') || path.includes('lab') || hash.includes('lab')) {
+        return 'themelab';
+      }
+      if (path.includes('kosweb') || hash.includes('kosweb') || search.includes('kosweb')) {
+        return 'koswebai';
+      }
+      if (path.includes('legacy') || hash.includes('legacy') || path.includes('tasks') || hash.includes('tasks')) {
+        return 'home';
+      }
+      if (path.includes('kos26') || hash.includes('kos26')) {
+        return 'kos26';
+      }
       if (path.includes('viewcompona') || hash.includes('viewcompona')) {
         return 'viewcompona';
       }
+      if (path.includes('kostest') || hash.includes('kostest')) {
+        return 'kostest';
+      }
     }
-    return 'home';
+    // KOSTEST הוא עמוד הבית המרכזי והרשמי של KOSUN 2026
+    return 'kostest';
   };
   const [activeScreen, setActiveScreen] = useState<ActiveScreen>(getInitialScreen);
 
+  if (activeScreen === 'themelab') {
+    return <ThemeLabScreen onBackToApp={() => setActiveScreen('kostest')} />;
+  }
+  if (activeScreen === 'koswebai') {
+    return <KosWebAiPortalPage onBackToApp={() => setActiveScreen('kostest')} />;
+  }
+  if (activeScreen === 'kostest') {
+    return <KosTestSite onBackToApp={() => setActiveScreen('home')} />;
+  }
+  if (activeScreen === 'kos26') {
+    return <Kos26Site onBackToApp={() => setActiveScreen('kostest')} />;
+  }
   if (activeScreen === 'viewcompona') {
-    return <ViewComponaScreen onBackHome={() => setActiveScreen('home')} />;
+    return <ViewComponaScreen onBackHome={() => setActiveScreen('kostest')} />;
   }
   const { user, loading: authLoading, logOut } = useAuth();
   const {
@@ -345,4 +378,6 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
+
 

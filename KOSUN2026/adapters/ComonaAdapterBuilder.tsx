@@ -140,7 +140,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
     <div dir="rtl" className="space-y-6 text-xs font-sans text-right">
       
       {/* 🚀 שלב 1 (בחירת פרויקט): מתג פרויקט ענק וברור */}
-      <div className="p-5 rounded-3xl bg-[#0E1424] border border-[#1C2744] space-y-4 shadow-xl">
+      <div className="p-5 rounded-3xl bg-[#111827] border border-slate-700/80 space-y-4 shadow-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-400 font-bold flex items-center justify-center text-xs border border-cyan-500/30">
@@ -169,7 +169,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
                 <span>🟢</span>
                 <span>פרויקט קמונה (glowmanage)</span>
               </div>
-              <p className="text-[11px] text-white/50 mt-1">מסד הנתונים של הלקוחות, משימות ודיירים</p>
+              <p className="text-[11px] text-slate-200 mt-1">מסד הנתונים של הלקוחות, משימות ודיירים</p>
             </div>
             {currentTargetProject === 'comona' && (
               <CheckCircle2 size={18} className="text-emerald-400" />
@@ -191,7 +191,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
                 <span>🔵</span>
                 <span>פרויקט קושאן (gen-lang-client)</span>
               </div>
-              <p className="text-[11px] text-white/50 mt-1">סגנונות העיצוב, הגדרות מקומיות ו-Presets</p>
+              <p className="text-[11px] text-slate-200 mt-1">סגנונות העיצוב, הגדרות מקומיות ו-Presets</p>
             </div>
             {currentTargetProject === 'kosun' && (
               <CheckCircle2 size={18} className="text-cyan-400" />
@@ -201,7 +201,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
       </div>
 
       {/* 📁 שלב 2: בחירת קולקציה בקליק אחד */}
-      <div className="p-5 rounded-3xl bg-[#0E1424] border border-[#1C2744] space-y-4 shadow-xl">
+      <div className="p-5 rounded-3xl bg-[#111827] border border-slate-700/80 space-y-4 shadow-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center text-xs border border-amber-500/30">
@@ -234,7 +234,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
                   <span className="font-bold text-white text-xs">{col.label}</span>
                   {isSelected && <CheckCircle2 size={15} className="text-amber-400" />}
                 </div>
-                <span className="text-[10px] text-white/40 mt-1 font-mono truncate">{col.desc}</span>
+                <span className="text-[10px] text-slate-300 mt-1 font-mono truncate">{col.desc}</span>
               </button>
             );
           })}
@@ -248,14 +248,14 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
               type="text"
               placeholder="למשל: tenants/vip-store/products או users"
               onChange={(e) => onChange({ ...config, collectionPath: e.target.value })}
-              className="w-full bg-[#05070E] border border-amber-500/40 focus:border-amber-400 rounded-xl p-3 text-xs text-white outline-none font-mono"
+              className="w-full bg-[#0f172a] border border-amber-500/40 focus:border-amber-400 rounded-xl p-3 text-xs text-white outline-none font-mono"
             />
           </div>
         )}
       </div>
 
       {/* 🪄 שלב 3: התאמת שדות "שגם ילד קטן יכול" (One-Click Pills) */}
-      <div className="p-5 rounded-3xl bg-[#0E1424] border border-[#1C2744] space-y-4 shadow-xl">
+      <div className="p-5 rounded-3xl bg-[#111827] border border-slate-700/80 space-y-4 shadow-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-xs border border-emerald-500/30">
@@ -263,7 +263,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
             </span>
             <div>
               <span className="font-extrabold text-white text-sm">התאמת שדות ל-UI בלחיצה אחת:</span>
-              <p className="text-[11px] text-white/50">לחץ על השדה שנמצא במסמך כדי לשדך אותו לאלמנט ב-UI</p>
+              <p className="text-[11px] text-slate-200">לחץ על השדה שנמצא במסמך כדי לשדך אותו לאלמנט ב-UI</p>
             </div>
           </div>
           <span className="text-[10px] bg-emerald-950 text-emerald-300 px-2.5 py-1 rounded-full border border-emerald-800">
@@ -273,7 +273,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
 
         {/* שורת השדות הזמינים שנמצאו במסמך האמיתי */}
         <div className="p-3 bg-black/40 rounded-2xl border border-white/5 space-y-2">
-          <span className="text-[10px] font-bold text-white/60 block">שדות שקיימים כרגע במסמכים בקולקציה זו:</span>
+          <span className="text-[10px] font-bold text-slate-100 block">שדות שקיימים כרגע במסמכים בקולקציה זו:</span>
           <div className="flex flex-wrap gap-1.5">
             {discoveredFields.map((field) => (
               <span
@@ -292,7 +292,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
             const currentSelectedField = (config.fieldMapping as any)[slot.key] || '';
 
             return (
-              <div key={slot.key} className="p-3.5 rounded-2xl bg-[#070A14] border border-white/10 flex flex-col justify-between gap-2.5">
+              <div key={slot.key} className="p-3.5 rounded-2xl bg-[#1f2937] border border-white/10 flex flex-col justify-between gap-2.5">
                 <div>
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-white text-xs flex items-center gap-1.5">
@@ -300,7 +300,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
                       <span>{slot.label}</span>
                       {slot.required && <span className="text-rose-400">*</span>}
                     </span>
-                    <span className="text-[10px] text-white/40">{slot.hint}</span>
+                    <span className="text-[10px] text-slate-300">{slot.hint}</span>
                   </div>
 
                   {/* כפתורי Pills מהירים לבחירה מבין השדות שנסרקו */}
@@ -315,7 +315,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
                           className={`px-2 py-0.5 rounded-md text-[10px] font-mono transition-all cursor-pointer ${
                             isChosen
                               ? 'bg-emerald-500 text-black font-extrabold shadow-sm shadow-emerald-500/40'
-                              : 'bg-white/5 text-white/70 hover:bg-white/15'
+                              : 'bg-white/5 text-white font-medium hover:bg-white/15'
                           }`}
                         >
                           {df}
@@ -331,7 +331,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
                   value={currentSelectedField}
                   onChange={(e) => handleUpdateMapping(slot.key, e.target.value)}
                   placeholder="הקלד שם שדה ידנית..."
-                  className="w-full bg-[#03050A] border border-white/10 focus:border-emerald-400 rounded-lg p-1.5 text-[11px] text-white font-mono outline-none"
+                  className="w-full bg-[#0f172a] border border-white/10 focus:border-emerald-400 rounded-lg p-1.5 text-[11px] text-white font-mono outline-none"
                 />
               </div>
             );
@@ -340,7 +340,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
       </div>
 
       {/* ⚡ שלב 4: מנהל האירועים והפעולות (Action Registry Visualizer) */}
-      <div className="p-5 rounded-3xl bg-[#0E1424] border border-[#1C2744] space-y-4 shadow-xl">
+      <div className="p-5 rounded-3xl bg-[#111827] border border-slate-700/80 space-y-4 shadow-xl">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-400 font-bold flex items-center justify-center text-xs border border-purple-500/30">
@@ -348,7 +348,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
             </span>
             <div>
               <span className="font-extrabold text-white text-sm">מנהל אירועים ופקודות (Action Registry Simulator):</span>
-              <p className="text-[11px] text-white/50">בדוק בלחיצה מה קורה כאשר נשלח אירוע מקומפוננטת ה-UI לפרויקט קמונה</p>
+              <p className="text-[11px] text-slate-200">בדוק בלחיצה מה קורה כאשר נשלח אירוע מקומפוננטת ה-UI לפרויקט קמונה</p>
             </div>
           </div>
           <span className="text-[10px] bg-purple-950 text-purple-300 px-2.5 py-1 rounded-full border border-purple-800">
@@ -373,7 +373,7 @@ export const ComonaAdapterBuilder: React.FC<ComonaAdapterBuilderProps> = ({
                 <Zap size={14} className="text-purple-400 group-hover:scale-125 transition-transform" />
               </div>
               <span className="text-[10px] font-mono text-purple-400 block mt-1">[{act.action}]</span>
-              <p className="text-[10px] text-white/40 mt-1">{act.desc}</p>
+              <p className="text-[10px] text-slate-300 mt-1">{act.desc}</p>
             </button>
           ))}
         </div>

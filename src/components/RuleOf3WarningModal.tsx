@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { AlertCircle, ArrowLeftRight, CalendarClock, Inbox, X, Check } from 'lucide-react';
 import { Task } from '../types';
 import { sound } from '../utils/audio';
+import { getTerminology } from '../../KOSUN2026/factory/pageTerminologyDictionary';
 
 interface RuleOf3WarningModalProps {
   attemptedTask: {
@@ -14,6 +15,7 @@ interface RuleOf3WarningModalProps {
   onReplaceTask: (oldTaskId: string, newTitle: string, estimatedMinutes?: number) => void;
   onPostponeToTomorrow: (title: string, estimatedMinutes?: number) => void;
   onSaveToInbox: (title: string) => void;
+  archetypeId?: string;
 }
 
 export const RuleOf3WarningModal: React.FC<RuleOf3WarningModalProps> = ({
@@ -23,6 +25,7 @@ export const RuleOf3WarningModal: React.FC<RuleOf3WarningModalProps> = ({
   onReplaceTask,
   onPostponeToTomorrow,
   onSaveToInbox,
+  archetypeId = 'saas',
 }) => {
   const [selectedTaskToReplace, setSelectedTaskToReplace] = useState<string | null>(null);
 
@@ -50,10 +53,10 @@ export const RuleOf3WarningModal: React.FC<RuleOf3WarningModalProps> = ({
           </div>
           <div>
             <h3 className="text-lg font-black text-white leading-tight font-['Orbitron',sans-serif]">
-              חוק ה-3 הקדוש: אין מקום לנכס 4!
+              {getTerminology('rule_of_3_modal_title', archetypeId)}
             </h3>
             <p className="text-xs text-[#F0F4FF]/70 mt-0.5">
-              המיקוד היומי מוגבל ל-3 נכסי מפתח בלבד כדי להבטיח ביצוע מושלם.
+              {getTerminology('rule_of_3_modal_subtitle', archetypeId)}
             </p>
           </div>
         </div>
@@ -61,7 +64,7 @@ export const RuleOf3WarningModal: React.FC<RuleOf3WarningModalProps> = ({
         {/* Attempted task display */}
         <div className="p-3.5 bg-[#12162B] border border-[#1A2B4C] rounded-2xl mb-5">
           <span className="text-xs font-bold text-[#00F0FF] uppercase tracking-wider block mb-1">
-            המשימה שניסית להוסיף:
+            {getTerminology('rule_of_3_attempted_badge', archetypeId)}
           </span>
           <p className="text-base font-bold text-white">
             "{attemptedTask.title}"
@@ -73,7 +76,7 @@ export const RuleOf3WarningModal: React.FC<RuleOf3WarningModalProps> = ({
           <div className="space-y-2.5">
             <label className="text-xs sm:text-sm font-bold text-white flex items-center gap-2">
               <ArrowLeftRight className="w-4 h-4 text-[#00F0FF]" />
-              <span>אפשרות א': החלף אחד מ-3 הנכסים הקיימים (הישן יחזור לתיק)</span>
+              <span>{getTerminology('rule_of_3_opt_replace_label', archetypeId)}</span>
             </label>
 
             <div className="space-y-2">
@@ -117,14 +120,14 @@ export const RuleOf3WarningModal: React.FC<RuleOf3WarningModalProps> = ({
                 }}
                 className="w-full min-h-[44px] py-2.5 px-4 bg-gradient-to-r from-[#00F0FF] to-[#00A3FF] text-[#070913] rounded-full text-sm font-black flex items-center justify-center gap-2 transition-all cursor-pointer shadow-[0_0_15px_rgba(0,240,255,0.35)]"
               >
-                <span>החלף עכשיו והעבר את המוחלף לתיק</span>
+                <span>{getTerminology('rule_of_3_replace_now_btn', archetypeId)}</span>
               </button>
             )}
           </div>
 
           <div className="border-t border-[#1A2B4C] pt-3.5 space-y-2.5">
             <span className="text-xs font-bold text-[#F0F4FF]/50 block">
-              או בחר פתרון חלופי:
+              {getTerminology('rule_of_3_alt_solutions_label', archetypeId)}
             </span>
 
             {/* Action 2: Postpone to tomorrow */}
@@ -142,10 +145,10 @@ export const RuleOf3WarningModal: React.FC<RuleOf3WarningModalProps> = ({
               <CalendarClock className="w-5 h-5 text-[#00F0FF] shrink-0" />
               <div>
                 <span className="font-bold block text-white">
-                  דחה למחר
+                  {getTerminology('rule_of_3_postpone_title', archetypeId)}
                 </span>
                 <span className="text-xs text-[#F0F4FF]/60">
-                  נשבץ אותו בטקס נעילת הערב כחלק מ-3 הנכסים של מחר
+                  {getTerminology('rule_of_3_postpone_desc', archetypeId)}
                 </span>
               </div>
             </button>
@@ -162,10 +165,10 @@ export const RuleOf3WarningModal: React.FC<RuleOf3WarningModalProps> = ({
               <Inbox className="w-5 h-5 text-[#00F0FF] shrink-0" />
               <div>
                 <span className="font-bold block text-white">
-                  שמור בתיק הנכסים
+                  {getTerminology('rule_of_3_inbox_title', archetypeId)}
                 </span>
                 <span className="text-xs text-[#F0F4FF]/60">
-                  שמור כרעיון גולמי ונפרק אותו בהמשך במעבדה
+                  {getTerminology('rule_of_3_inbox_desc', archetypeId)}
                 </span>
               </div>
             </button>

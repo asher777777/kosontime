@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Check, X } from 'lucide-react';
 import { sound } from '../utils/audio';
+import { getTerminology } from '../../KOSUN2026/factory/pageTerminologyDictionary';
 
 interface PureFocusInputModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface PureFocusInputModalProps {
   multiline?: boolean;
   onSave: (value: string) => void;
   onClose: () => void;
+  archetypeId?: string;
 }
 
 /**
@@ -26,6 +28,7 @@ export const PureFocusInputModal: React.FC<PureFocusInputModalProps> = ({
   multiline = false,
   onSave,
   onClose,
+  archetypeId = 'saas',
 }) => {
   const [value, setValue] = useState(initialValue);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
@@ -76,7 +79,7 @@ export const PureFocusInputModal: React.FC<PureFocusInputModalProps> = ({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={placeholder || 'הקלד כאן...'}
+              placeholder={placeholder || getTerminology('pure_focus_placeholder', archetypeId)}
               rows={5}
               className="w-full p-5 rounded-3xl bg-[#0D0E1F] border-2 border-[#00F0FF]/60 focus:border-[#00F0FF] text-lg sm:text-xl font-medium text-[#F0F4FF] placeholder-[#F0F4FF]/30 outline-none shadow-[0_0_25px_rgba(0,240,255,0.2)] resize-none transition-all"
             />
@@ -87,7 +90,7 @@ export const PureFocusInputModal: React.FC<PureFocusInputModalProps> = ({
               value={value}
               onChange={(e) => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={placeholder || 'הקלד כאן...'}
+              placeholder={placeholder || getTerminology('pure_focus_placeholder', archetypeId)}
               className="w-full min-h-[64px] px-6 rounded-full bg-[#0D0E1F] border-2 border-[#00F0FF]/60 focus:border-[#00F0FF] text-xl font-semibold text-[#F0F4FF] placeholder-[#F0F4FF]/30 outline-none shadow-[0_0_25px_rgba(0,240,255,0.2)] transition-all"
             />
           )}
@@ -99,7 +102,7 @@ export const PureFocusInputModal: React.FC<PureFocusInputModalProps> = ({
             type="button"
             onClick={onClose}
             className="w-14 h-14 rounded-full bg-[#1A2B4C]/60 hover:bg-[#1A2B4C] border border-[#1A2B4C] text-[#F0F4FF]/70 hover:text-[#F0F4FF] flex items-center justify-center transition-all cursor-pointer active:scale-95"
-            title="ביטול"
+            title={getTerminology('pure_focus_cancel_tooltip', archetypeId)}
           >
             <X className="w-6 h-6" />
           </button>
@@ -109,10 +112,10 @@ export const PureFocusInputModal: React.FC<PureFocusInputModalProps> = ({
             onClick={handleSave}
             disabled={!value.trim()}
             className="h-14 px-8 rounded-full bg-gradient-to-r from-[#00F0FF] to-[#0077E6] text-[#070913] font-bold text-lg flex items-center gap-2 shadow-[0_0_20px_rgba(0,240,255,0.4)] hover:shadow-[0_0_30px_rgba(0,240,255,0.6)] disabled:opacity-40 transition-all cursor-pointer active:scale-95"
-            title="שמירה"
+            title={getTerminology('pure_focus_save_btn', archetypeId)}
           >
             <Check className="w-6 h-6 stroke-[3]" />
-            <span>אישור ושמירה</span>
+            <span>{getTerminology('pure_focus_save_btn', archetypeId)}</span>
           </button>
         </div>
       </div>

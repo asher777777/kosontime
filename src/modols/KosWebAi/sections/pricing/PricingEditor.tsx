@@ -1,0 +1,198 @@
+import React from 'react';
+import { PricingSectionConfig, PricingPackageItem } from '../../types/sectionConfigs';
+import { PageBuilderInput, resolveInputValue } from '../../ui/PageBuilderInput';
+import { Plus, Trash2 } from 'lucide-react';
+
+export const PricingEditor: React.FC<{
+  config: PricingSectionConfig;
+  onChange: (updated: PricingSectionConfig) => void;
+}> = ({ config, onChange }) => {
+  const handlePackageChange = (index: number, field: keyof PricingPackageItem, rawValue: any) => {
+    const value = typeof rawValue === 'string' || typeof rawValue === 'number' || typeof rawValue === 'boolean'
+      ? rawValue
+      : resolveInputValue(rawValue);
+    const updated = [...(config.packages || [])];
+    updated[index] = { ...updated[index], [field]: value };
+    onChange({ ...config, packages: updated });
+  };
+
+  const handleAddPackage = () => {
+    const newPkg: PricingPackageItem = {
+      id: `pkg_${Date.now()}`,
+      name: 'חבילה חדשה',
+      priceMonthly: '₪149',
+      priceYearly: '₪119',
+      period: '/ חודש',
+      description: 'פירוט קצר על החבילה',
+      features: ['תכונה ראשונה', 'תכונה שנייה', 'תמיכה מלאה'],
+      buttonText: 'בחר מסלול',
+      buttonUrl: '#contact',
+    };
+    onChange({ ...config, packages: [...(config.packages || []), newPkg] });
+  };
+
+  const handleDeletePackage = (index: number) => {
+    const updated = (config.packages || []).filter((_, i) => i !== index);
+    onChange({ ...config, packages: updated });
+  };
+
+  return (
+    <div className="flex flex-col gap-6 text-right" dir="rtl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <PageBuilderInput
+          label="כותרת מחירון"
+          value={config.title || ''}
+          onChange={(e) => onChange({ ...config, title: resolveInputValue(e) })}
+        />
+        <PageBuilderInput
+          label="תת-כותרת / תגית"
+          value={config.subtitle || ''}
+          onChange={(e) => onChange({ ...config, subtitle: resolveInputValue(e) })}
+        />
+      </div>
+
+      <div className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl flex flex-col gap-3">
+        <h4 className="text-xs font-bold text-slate-300">מתג תשלום שנתי / חודשי</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={config.showBillingToggle !== false}
+              onChange={(e) => onChange({ ...config, showBillingToggle: e.target.checked })}
+              className="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0"
+            />
+            <span>הצג מתג חודשי/שנתי</span>
+          </label>
+          <PageBuilderInput
+            label="תגית הנחה שנתית (Badge)"
+            value={config.yearlyDiscountBadge || 'חיסכון של 20%'}
+            onChange={(e) => onChange({ ...config, yearlyDiscountBadge: resolveInputValue(e) })}
+          />
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-2">
+        <h4 className="text-sm font-bold text-white">חבילות מחיר ({config.packages?.length || 0})</h4>
+        <button
+          type="button"
+          onClick={handleAddPackage}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          <span>הוסף חבילה</span>
+        </button>
+      </div>
+
+      <div className="flex flex-col gap-3">
+        {config.packages?.map((pkg, idx) => (
+          <div key={pkg.id || idx} className="p-4 bg-slate-950/70 border border-slate-800 rounded-2xl flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-indigo-400">חבילה #{idx + 1}</span>
+              <button
+                type="button"
+                onClick={() => handleDeletePackage(idx)}
+                className="text-slate-500 hover:text-red-400 p-1 transition-colors"
+                title="מחק"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <PageBuilderInput
+                label="שם החבילה"
+                value={pkg.name || ''}
+                onChange={(e) => handlePackageChange(idx, 'name', resolveInputValue(e))}
+              />
+              <PageBuilderInput
+                label="מחיר חודשי"
+                value={pkg.priceMonthly || ''}
+                onChange={(e) => handlePackageChange(idx, 'priceMonthly', resolveInputValue(e))}
+              />
+              <PageBuilderInput
+                label="מחיר שנתי מוזל"
+                value={pkg.priceYearly || ''}
+                onChange={(e) => handlePackageChange(idx, 'priceYearly', resolveInputValue(e))}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <PageBuilderInput
+                label="תגית / Badge"
+                value={pkg.badge || ''}
+                onChange={(e) => handlePackageChange(idx, 'badge', resolveInputValue(e))}
+              />
+              <label className="flex items-center gap-2 text-xs text-slate-300 cursor-pointer pt-6">
+                <input
+                  type="checkbox"
+                  checked={pkg.isFeatured || false}
+                  onChange={(e) => handlePackageChange(idx, 'isFeatured', e.target.checked)}
+                  className="rounded bg-slate-800 border-slate-700 text-indigo-600 focus:ring-0"
+                />
+                <span>הבלט חבילה זו (Pro Highlight)</span>
+              </label>
+              <PageBuilderInput
+                label="טקסט כפתור"
+                value={pkg.buttonText || ''}
+                onChange={(e) => handlePackageChange(idx, 'buttonText', resolveInputValue(e))}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-900/60 rounded-xl border border-slate-800/80">
+              <div>
+                <label className="block text-[11px] text-slate-400 mb-1 font-bold">סוג פעולה בלחיצה על הכפתור:</label>
+                <select
+                  value={pkg.actionType || 'kesher_checkout'}
+                  onChange={(e) => handlePackageChange(idx, 'actionType', e.target.value)}
+                  className="w-full bg-slate-950 border border-slate-800 text-white rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 font-bold"
+                >
+                  <option value="kesher_checkout">סליקת קשר ישירה (אשראי, ביט, חשבונית/קבלה)</option>
+                  <option value="smart_form">פתיחת טופס חכם רב-שלבי (Smart Form)</option>
+                  <option value="external_url">קישור חיצוני / גלילה בעמוד</option>
+                </select>
+              </div>
+
+              {pkg.actionType === 'smart_form' ? (
+                <div>
+                  <label className="block text-[11px] text-indigo-300 mb-1 font-bold">בחר תבנית טופס חכם:</label>
+                  <select
+                    value={pkg.formTemplateId || 'template_pricing_quote'}
+                    onChange={(e) => handlePackageChange(idx, 'formTemplateId', e.target.value)}
+                    className="w-full bg-slate-950 border border-indigo-500/40 text-indigo-200 rounded-xl p-2 text-xs focus:outline-none focus:border-indigo-500 font-bold"
+                  >
+                    <option value="template_pricing_quote">התאמת חבילה והצעת מחיר אישית</option>
+                    <option value="template_course_registration">הרשמה לקורס / הכשרה יוקרתית</option>
+                    <option value="template_vip_discovery_call">תיאום שיחת ייעוץ אסטרטגית VIP</option>
+                    <option value="template_ambassador_onboarding">הצטרפות לשגרירי קהילה ומובילים</option>
+                    <option value="template_donation_pledge">טופס תרומה והוראת קבע לחסד</option>
+                  </select>
+                </div>
+              ) : pkg.actionType === 'external_url' ? (
+                <PageBuilderInput
+                  label="כתובת URL להפניה"
+                  value={pkg.buttonUrl || ''}
+                  onChange={(e) => handlePackageChange(idx, 'buttonUrl', resolveInputValue(e))}
+                  placeholder="https://example.com/checkout או #contact"
+                />
+              ) : (
+                <div className="flex items-center text-xs text-emerald-400 font-bold gap-1 pt-6">
+                  <span>✓ מחובר לסליקת קשר ולסנכרון כרטיס איש קשר ב-CRM</span>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-xs text-slate-400 mb-1 font-medium">רשימת פיצ׳רים (שורה אחר שורה)</label>
+              <textarea
+                rows={3}
+                value={(pkg.features || []).join('\n')}
+                onChange={(e) => handlePackageChange(idx, 'features', e.target.value.split('\n').filter(Boolean))}
+                className="w-full bg-slate-900 border border-slate-800 text-white rounded-xl p-3 text-xs focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};

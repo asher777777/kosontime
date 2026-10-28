@@ -1,0 +1,286 @@
+export interface CustomTab {
+  id: string;
+  title: string;
+  icon: string;
+}
+
+export interface CustomField {
+  id: string;
+  category: string;
+  type: string; // text, date, number, etc.
+  label: string;
+}
+
+export interface ContactEvent {
+  time: string;
+  title: string;
+  text: string;
+}
+
+export interface FormSubmission {
+  name: string;
+  page: string;
+  date: string;
+  payload?: Record<string, any>;
+}
+
+export interface PaymentRecord {
+  id?: string;
+  date: string;
+  amount: number;
+  paymentType: string;
+  receiptType?: string;
+  kesherStatus?: string;
+  receiptLink?: string;
+}
+
+export interface AIInteraction {
+  date: string;
+  summary: string;
+  sentiment?: 'positive' | 'neutral' | 'negative' | 'urgent';
+  nextBestAction?: string;
+  draftMessage?: string;
+  inputTokens?: number;
+  outputTokens?: number;
+  cost?: number;
+}
+
+export interface UserSubscription {
+  id: string;
+  componentName: string;
+  packageName?: string;
+  paymentAmount: number;
+  startDate: string;
+  endDate?: string;
+  subdomain?: string;
+  // Extra SaaS Subscription fields
+  status?: 'active' | 'paused' | 'past_due' | 'canceled';
+  billingCycle?: 'monthly' | 'annually' | 'one_time';
+  nextBillingDate?: string;
+  billingCustomerId?: string;
+  cancellationReason?: string;
+  paymentMethod?: string;
+}
+
+export interface Contact {
+  id?: string;
+  ownerId?: string;
+  status: "active" | "trashed";
+  
+  // Lead / Contact Type Identification
+  is_lead?: boolean;
+  contact_type?: 'contact' | 'lead';
+  
+  // Subscriptions
+  subscriptions?: UserSubscription[];
+  content_subscriptions?: import('../../../core/contracts').ContactContentSubscription[];
+  kosun_crm_content_subscriptions?: import('../../../core/contracts').ContactContentSubscription[];
+  quiz_results?: import('../../../core/contracts').ContactQuizSubmission[];
+  kosun_crm_quiz_results?: import('../../../core/contracts').ContactQuizSubmission[];
+
+  // Canonical KOSUN CRM Schema (kosun_crm_*)
+  kosun_crm_name?: string;
+  kosun_crm_phone?: string;
+  kosun_crm_email?: string;
+  kosun_crm_company?: string;
+  kosun_crm_city?: string;
+  kosun_crm_street?: string;
+  kosun_crm_gov_id?: string;
+  kosun_crm_notes?: string;
+  kosun_crm_tags?: string[];
+  kosun_crm_source?: string;
+  kosun_crm_role?: string;
+
+  // Legacy Core Fields (being migrated to kosun_crm_*)
+  conta_name?: string;
+  f_m?: string;
+  conta_phone?: string;
+  email?: string;
+  gender?: string;
+  
+  // Legacy Address Fields
+  mh_crm_city?: string;
+  mh_crm_street?: string;
+  
+  // Legacy Tag Fields
+  tg1?: string;
+  tg2?: string;
+  tg3?: string;
+  tags?: string[];
+
+  // Legacy Company Fields
+  company_name?: string;
+  job_title?: string;
+  lead_source?: string;
+
+  // Other Contact Info
+  segment?: string;
+  work_phone?: string;
+  website?: string;
+  birth_date?: string;
+  notes?: string;
+  events?: ContactEvent[];
+  form_submissions?: FormSubmission[];
+
+  // Form Tracking Fields
+  last_form_name?: string;
+  last_form_page?: string;
+  last_form_submission_date?: string;
+  
+  // Community & System User Fields
+  community?: string;
+  mh_crm_community?: string;
+  communityIds?: string[];
+  isUser?: boolean;
+  systemUserId?: string;
+
+  // Subdomain & Multi-Tenant User Fields (איש קשר סאב-דומיין ומשתמש מערכת)
+  isSubdomainAdmin?: boolean;
+  subdomain?: string;
+  fullDomain?: string;
+  adminUsername?: string;
+  adminPassword?: string;
+  activeModules?: string[];
+  tenantStatus?: 'active' | 'suspended' | 'draft';
+  billingPlan?: 'monthly' | 'annual' | 'custom';
+  monthlyTotal?: number;
+  subdomainNotes?: string;
+
+  // WooCommerce Summary Fields
+  total_spent?: number;
+  order_count?: number;
+  last_order_date?: string;
+  payments?: PaymentRecord[];
+
+  // Campaign & Ambassador Fields
+  campaign_id?: string;
+  campaign_title?: string;
+  campaign_amount?: number;
+  campaign_role?: string;
+  campaign_target_goal?: number;
+  campaign_total_raised?: number;
+  ambassador_page_url?: string;
+
+  // AI Insights
+  ai_sentiment_score?: number; // 0 - 100
+  ai_lead_temperature?: 'hot' | 'warm' | 'cold';
+  ai_summary?: string;
+  ai_next_best_action?: string;
+  ai_interactions?: AIInteraction[];
+
+  // Timestamps
+  createdAt?: string;
+  updatedAt?: string;
+
+  // Dynamic custom fields
+  [key: string]: any;
+}
+
+export interface NumericFieldAggEntry {
+  contactId: string;
+  parentName: string;
+  phone: string;
+  childName?: string;
+  totalSpent: number;
+  hasPaid: boolean;
+  value: number;
+}
+
+export interface NumericFieldAgg {
+  sum: number;
+  count: number;
+  entries: NumericFieldAggEntry[];
+}
+
+export interface CRMAnalyticsFilter {
+  startDate?: string;
+  endDate?: string;
+  status?: "active" | "trashed" | "all";
+  typeFilter?: "all" | "contacts" | "leads";
+  metricFilter?: string | null;
+  source?: string;
+  tag?: string;
+  form?: string;
+  community?: string;
+  searchTerm?: string;
+}
+
+export interface CRMAnalyticsData {
+  totalContacts: number;
+  totalLeads: number;
+  totalContactsOnly: number;
+  totalSpent: number;
+  totalCampaignAmount: number;
+  tagsCount: Record<string, number>;
+  leadSourcesCount: Record<string, number>;
+  communitiesCount: Record<string, number>;
+  formsCount: Record<string, number>;
+  numericFieldsAgg: Record<string, NumericFieldAgg>;
+  textFieldsAgg: Record<string, Record<string, number>>;
+  contacts: Contact[];
+  customFields: CustomField[];
+}
+
+export interface DynamicColumn {
+  id: string;
+  label: string;
+  category: "core" | "financial" | "tag" | "form" | "custom" | "system";
+  isNumeric?: boolean;
+  isDate?: boolean;
+}
+
+export interface SavedAnalyticsView {
+  id: string;
+  name: string;
+  createdAt: string;
+  selectedColumns: string[];
+  filters: {
+    startDate?: string;
+    endDate?: string;
+    dataSource: "contacts" | "forms";
+    status: "active" | "trashed" | "all";
+    tags: string[];
+    community?: string;
+    leadSource?: string;
+    formName?: string;
+  };
+}
+
+export type DatabaseProviderType = 'firestore' | 'supabase' | 'rest_api' | 'mock_dataset';
+
+export interface DatabaseConnectionProfile {
+  id: string;
+  name: string;
+  provider: DatabaseProviderType;
+  isActive: boolean;
+  createdAt: string;
+  config: {
+    // Firestore
+    projectId?: string;
+    apiKey?: string;
+    authDomain?: string;
+    collectionName?: string;
+    // Supabase / SQL
+    supabaseUrl?: string;
+    supabaseAnonKey?: string;
+    tableName?: string;
+    // REST API
+    apiUrl?: string;
+    bearerToken?: string;
+    method?: 'GET' | 'POST';
+  };
+  fieldMappings?: Record<string, string>;
+}
+
+export interface CustomCrmChart {
+  id: string;
+  title: string;
+  type: 'bar' | 'pie' | 'line' | 'area';
+  groupByField: string;
+  metric: 'count' | 'sum' | 'avg';
+  metricField?: string;
+  color?: string;
+  description?: string;
+  createdAt: string;
+  createdBy?: 'manual' | 'ai';
+}

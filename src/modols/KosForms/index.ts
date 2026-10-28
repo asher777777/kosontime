@@ -1,0 +1,46 @@
+import { registerCapabilityUI } from '../../core/bridge/CapabilitySlot';
+import { SmartFormRunner } from './components/runner/SmartFormRunner';
+import { FormBuilderStudio } from './components/builder/FormBuilderStudio';
+
+registerCapabilityUI('form-runner', SmartFormRunner);
+registerCapabilityUI('form-renderer', SmartFormRunner);
+registerCapabilityUI('form-builder', FormBuilderStudio);
+
+export * from './types';
+export * from './config/constants';
+export * from './config/luxuryIcons';
+export * from './config/tonePresets';
+export * from './config/formTemplates';
+export * from './services/aiFormService';
+export * from './services/formStorageService';
+export * from './services/submissionStorageService';
+export * from './services/whatsappTemplateService';
+export * from './services/whatsappTemplateStorageService';
+export * from './services/aiWhatsAppTemplateService';
+export * from './services/formWhatsAppService';
+export * from './context/SmartFormContext';
+export * from './context/useSmartForm';
+export * from './hooks/useFormSubmissions';
+export * from './hooks/useFormRunnerState';
+export * from './hooks/useSpeechRecognition';
+export * from './components/shared/LuxuryIconRenderer';
+export * from './components/shared/IconPickerModal';
+export * from './components/shared/FormEmbedModal';
+export * from './components/runner/SmartFormRunner';
+export * from './components/runner/StepRenderer';
+export * from './components/runner/ProgressBar';
+export * from './components/runner/FormCompletionScreen';
+export * from './components/builder/FormBuilderStudio';
+export * from './components/builder/AIBrainstormModal';
+export * from './components/builder/FormStepsEditor';
+export * from './components/builder/StepFieldConfig';
+export * from './components/builder/FormStyleSettings';
+export * from './components/builder/FormWhatsAppAutomationsTab';
+export * from './components/analytics/FormSubmissionsTable';
+export * from './components/analytics/FormAnalyticsSummary';
+export * from './components/analytics/SubmissionDetailModal';
+export * from './components/donation/CampaignTiersList';
+export * from './components/donation/DonationDrawer';
+export * from './types/donation.types';
+export * from './StandaloneView';
+

@@ -15,6 +15,7 @@ import { Task, InboxItem, MicroTask } from '../types';
 import { sound } from '../utils/audio';
 import { KosunVectorIcon } from './KosunLogo';
 import { KosunIconButton } from './KosunIconButton';
+import { getTerminology } from '../../KOSUN2026/factory/pageTerminologyDictionary';
 
 interface EveningRitualModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ interface EveningRitualModalProps {
   onDeleteTask: (taskId: string) => void;
   onApplyTomorrowBig3: (selectedMicroTasks: MicroTask[]) => void;
   onOpenDecomposeForInboxItem: (item: InboxItem) => void;
+  archetypeId?: string;
 }
 
 export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
@@ -42,6 +44,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
   onDeleteTask,
   onApplyTomorrowBig3,
   onOpenDecomposeForInboxItem,
+  archetypeId = 'saas',
 }) => {
   const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
   const [selectedTomorrow, setSelectedTomorrow] = useState<MicroTask[]>([]);
@@ -113,7 +116,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
 
           <KosunIconButton
             icon={X}
-            label="סגור"
+            label={getTerminology('quick_capture_close_btn', archetypeId)}
             variant="ghost"
             onClick={onClose}
           />
@@ -172,7 +175,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
                     <div className="flex items-center gap-1 shrink-0">
                       <KosunIconButton
                         icon={Check}
-                        label="השלם"
+                        label={getTerminology('evening_action_complete', archetypeId)}
                         variant="cyan"
                         onClick={() => {
                           sound.playPop();
@@ -182,7 +185,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
 
                       <KosunIconButton
                         icon={Calendar}
-                        label="למחר"
+                        label={getTerminology('evening_action_tomorrow', archetypeId)}
                         variant="secondary"
                         onClick={() => {
                           sound.playPop();
@@ -192,7 +195,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
 
                       <KosunIconButton
                         icon={Inbox}
-                        label="לתיק"
+                        label={getTerminology('evening_action_inbox', archetypeId)}
                         variant="secondary"
                         onClick={() => {
                           sound.playPop();
@@ -202,7 +205,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
 
                       <KosunIconButton
                         icon={Trash2}
-                        label="מחק"
+                        label={getTerminology('evening_action_delete', archetypeId)}
                         variant="ghost"
                         onClick={() => {
                           sound.playPop();
@@ -223,7 +226,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
                 }}
                 className="min-h-[44px] px-6 py-2 bg-gradient-to-r from-[#00F0FF] to-[#00A3FF] text-[#070913] font-black rounded-full text-sm flex items-center gap-2 transition-all cursor-pointer shadow-[0_0_15px_rgba(0,240,255,0.35)]"
               >
-                <span>הבא</span>
+                <span>{getTerminology('evening_btn_next', archetypeId)}</span>
                 <ArrowLeft className="w-4 h-4" />
               </button>
             </div>
@@ -250,7 +253,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
 
                     <KosunIconButton
                       icon={Layers}
-                      label={item.decomposed ? 'ערוך פירוק' : 'פרק במעבדה'}
+                      label={item.decomposed ? getTerminology('evening_action_edit_decompose', archetypeId) : getTerminology('evening_action_decompose', archetypeId)}
                       variant="cyan"
                       onClick={() => {
                         onClose();
@@ -267,7 +270,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
                 onClick={() => setCurrentStep(1)}
                 className="px-4 py-2 bg-[#1A2B4C] hover:bg-[#1A2B4C]/80 text-[#F0F4FF] rounded-full text-xs font-semibold cursor-pointer"
               >
-                חזור
+                {getTerminology('evening_btn_back', archetypeId)}
               </button>
 
               <button
@@ -277,7 +280,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
                 }}
                 className="min-h-[44px] px-6 py-2 bg-gradient-to-r from-[#00F0FF] to-[#00A3FF] text-[#070913] font-black rounded-full text-sm flex items-center gap-2 transition-all cursor-pointer shadow-[0_0_15px_rgba(0,240,255,0.35)]"
               >
-                <span>הבא</span>
+                <span>{getTerminology('evening_btn_next', archetypeId)}</span>
                 <ArrowLeft className="w-4 h-4" />
               </button>
             </div>
@@ -296,7 +299,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
                   onClick={onClose}
                   className="min-h-[44px] px-8 py-2.5 bg-gradient-to-r from-[#00F0FF] to-[#00A3FF] text-[#070913] font-black rounded-full text-sm cursor-pointer shadow-md"
                 >
-                  סגור
+                  {getTerminology('evening_success_close', archetypeId)}
                 </button>
               </div>
             ) : (
@@ -358,7 +361,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
                     type="text"
                     value={customTomorrowInput}
                     onChange={(e) => setCustomTomorrowInput(e.target.value)}
-                    placeholder="נכס חדש למחר..."
+                    placeholder={getTerminology('evening_task_placeholder', archetypeId)}
                     className="flex-1 px-4 py-2 bg-[#070913] border border-[#1A2B4C] rounded-full text-sm text-white placeholder:text-[#F0F4FF]/40 focus:outline-none"
                   />
                   <button
@@ -366,7 +369,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
                     disabled={!customTomorrowInput.trim() || selectedTomorrow.length >= 3}
                     className="px-5 py-2 bg-[#1A2B4C] hover:bg-[#1A2B4C]/80 disabled:opacity-30 text-white rounded-full text-xs font-bold cursor-pointer"
                   >
-                    הוסף
+                    {getTerminology('evening_btn_add', archetypeId)}
                   </button>
                 </form>
 
@@ -400,7 +403,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
                     onClick={() => setCurrentStep(2)}
                     className="px-4 py-2 bg-[#1A2B4C] hover:bg-[#1A2B4C]/80 text-[#F0F4FF] rounded-full text-xs font-semibold cursor-pointer"
                   >
-                    חזור
+                    {getTerminology('evening_btn_back', archetypeId)}
                   </button>
 
                   <button
@@ -409,7 +412,7 @@ export const EveningRitualModal: React.FC<EveningRitualModalProps> = ({
                     className="min-h-[44px] px-6 py-2 bg-gradient-to-r from-[#00F0FF] to-[#00A3FF] hover:brightness-110 disabled:opacity-30 text-[#070913] font-black rounded-full text-xs sm:text-sm flex items-center gap-2 transition-all cursor-pointer shadow-[0_0_20px_rgba(0,240,255,0.4)]"
                   >
                     <Sparkles className="w-4 h-4 text-[#070913]" />
-                    <span>שמור וסיים</span>
+                    <span>{getTerminology('evening_btn_finish', archetypeId)}</span>
                   </button>
                 </div>
               </>

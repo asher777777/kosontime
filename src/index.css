@@ -2,8 +2,10 @@
 
 @layer base {
   :root {
-    --font-sans: 'Assistant', 'Montserrat', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    --font-display: 'Orbitron', 'Montserrat', sans-serif;
+    --font-sans: 'Heebo', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-display: 'Heebo', 'Orbitron', 'Montserrat', sans-serif;
+    --font-serif: 'Heebo', serif;
+    --font-mono: 'Heebo', monospace;
     --color-midnight: #070913;
     --color-cyan: #00F0FF;
     --color-ice: #F0F4FF;
@@ -45,93 +47,7 @@
   }
 }
 
-/* ================= DAY MODE (LIGHT) ADAPTATIONS ================= */
-html.light .bg-\[\#070913\] {
-  background-color: #F4F7FC !important;
-}
-
-html.light .bg-\[\#070913\]\/90,
-html.light .bg-\[\#070913\]\/85 {
-  background-color: rgba(244, 247, 252, 0.92) !important;
-}
-
-html.light .bg-\[\#0D0E1F\] {
-  background-color: #FFFFFF !important;
-  box-shadow: 0 4px 20px rgba(10, 25, 50, 0.06);
-}
-
-html.light .bg-\[\#0D0E1F\]\/95,
-html.light .bg-\[\#0D0E1F\]\/90 {
-  background-color: rgba(255, 255, 255, 0.95) !important;
-  box-shadow: 0 4px 20px rgba(10, 25, 50, 0.08);
-}
-
-html.light .bg-\[\#0A0D1B\]\/80,
-html.light .bg-\[\#0A0D1B\]\/40 {
-  background-color: #EBF1FA !important;
-}
-
-html.light .bg-\[\#12162B\] {
-  background-color: #F0F4FA !important;
-}
-
-html.light .bg-\[\#1A2B4C\] {
-  background-color: #E2EBF6 !important;
-  color: #0A1128 !important;
-}
-
-html.light .bg-\[\#0D1F38\] {
-  background-color: #E0F2FE !important;
-}
-
-html.light .border-\[\#1A2B4C\] {
-  border-color: #D4E1F0 !important;
-}
-
-html.light .border-\[\#1A2B4C\]\/80,
-html.light .border-\[\#1A2B4C\]\/50 {
-  border-color: #D4E1F0 !important;
-}
-
-html.light .text-\[\#F0F4FF\] {
-  color: #0A1128 !important;
-}
-
-html.light .text-\[\#F0F4FF\]\/80,
-html.light .text-\[\#F0F4FF\]\/70,
-html.light .text-\[\#F0F4FF\]\/60,
-html.light .text-\[\#F0F4FF\]\/50,
-html.light .text-\[\#F0F4FF\]\/40 {
-  color: #556882 !important;
-}
-
-html.light .text-white {
-  color: #0A1128 !important;
-}
-
-/* In light mode, enhance cyan text contrast for readability */
-html.light .text-\[\#00F0FF\] {
-  color: #0077E6 !important;
-}
-
-html.light .bg-\[\#00F0FF\]\/15,
-html.light .bg-\[\#00F0FF\]\/10 {
-  background-color: rgba(0, 119, 230, 0.12) !important;
-  border-color: rgba(0, 119, 230, 0.25) !important;
-}
-
-/* Primary buttons keep their bold high-contrast electric gradient */
-html.light .bg-gradient-to-r.from-\[\#00F0FF\].to-\[\#00A3FF\] {
-  background-image: linear-gradient(to right, #00C8FF, #0088FF) !important;
-  color: #FFFFFF !important;
-}
-
-/* Swipe handle in light mode */
-html.light .bg-gradient-to-br.from-\[\#12162B\].to-\[\#1A2B4C\] {
-  background-image: linear-gradient(to bottom right, #FFFFFF, #E8EEF8) !important;
-  border-color: #0088FF !important;
-  box-shadow: 0 4px 15px rgba(0, 136, 255, 0.25) !important;
-}
+/* DAY MODE OVERRIDES REMOVED TO PREVENT TEXT EXTINCTION */
 
 /* KOSUN Glow and Cyber Aesthetics */
 .glow-cyan {

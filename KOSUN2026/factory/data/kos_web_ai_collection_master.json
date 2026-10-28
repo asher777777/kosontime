@@ -1,0 +1,514 @@
+{
+  "_metadata": {
+    "collection": "kos_web_ai_master",
+    "version": "2026.1",
+    "lastUpdated": "2026-10-28T14:00:00.000Z",
+    "displayName": "קולקציית KOSWEBAI • מחולל עמודים ואתרים אוטונומי",
+    "description": "קולקציית הפונקציות, היכולות, המקטעים והתבניות של מודול KOSWEBAI – מאפשרת הקמת אתרים, דפי נחיתה ומשפכים במצב אורח ובמצב משתמש (עורך/מנהל).",
+    "supportedArchetypes": [
+      "saas",
+      "automotive",
+      "beauty",
+      "real_estate",
+      "community",
+      "legal"
+    ],
+    "supportedAudiences": [
+      "guest",
+      "user"
+    ],
+    "totalFunctions": 16,
+    "totalSections": 14,
+    "totalBlueprints": 5
+  },
+  "audiences": {
+    "guest": {
+      "id": "guest",
+      "label": "מצב אורח (לקוח)",
+      "badge": "חוויית גולש",
+      "description": "חוויית משתמש וגולש נקייה המאפשרת חקר עמודים, התנסות במחולל הרעיונות, צפייה בתבניות פרימיום ושליחת פניות ישירות.",
+      "allowedActionKeys": [
+        "explore_pages",
+        "try_ai_generator",
+        "view_blueprints",
+        "preview_mobile",
+        "submit_lead",
+        "share_qr",
+        "view_legal"
+      ]
+    },
+    "user": {
+      "id": "user",
+      "label": "מצב משתמש (עורך ומנהל)",
+      "badge": "מרכז שליטה",
+      "description": "סביבת עבודה מקצועית מלאה הכוללת יצירת דפים חדשים, עריכת מקטעים, סטודיו AI חי, דשבורד קידום SEO, ניהול פרסום וסנכרון Brand DNA.",
+      "allowedActionKeys": [
+        "open_new_page",
+        "open_editor",
+        "duplicate_page",
+        "toggle_publish",
+        "open_ai_builder",
+        "open_marketing_ideas",
+        "open_seo_hub",
+        "open_shortener",
+        "ensure_legal_pages",
+        "convert_to_video",
+        "manage_sections",
+        "sync_brand_dna",
+        "style_preset_picker",
+        "export_blueprint",
+        "delete_page"
+      ]
+    }
+  },
+  "functions": [
+    {
+      "id": "fn_create_new_page",
+      "name": "createNewPageWizard",
+      "title": "הקמת עמוד אינטרנט חדש",
+      "category": "page_management",
+      "categoryLabel": "ניהול עמודים",
+      "audience": "user",
+      "summary": "אשף הקמת עמוד חדש לפי קטגוריה: KOSASS, KOSINFO, KOSEVENT, KOSCOMMUNITY, KOSTUBE.",
+      "processStep": "שלב 1: בחירת קטגוריית עמוד ➔ הגדרת כותרת וסלאג ➔ פריסת מקטעים.",
+      "actionKey": "open_new_page",
+      "badge": "עמוד חדש",
+      "icon": "PlusCircle",
+      "ctaText": "הקם עמוד עכשיו ◀",
+      "tags": [
+        "עמוד חדש", "דף חדש", "יצירת עמוד", "הוספת דף", "דף נחיתה", "landing page",
+        "createnewpage", "הקמת עמוד", "פתיחת דף", "אשף הקמה"
+      ],
+      "targetLayout": "accordion_morph",
+      "guestAvailable": false,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_open_editor",
+      "name": "openPageEditor",
+      "title": "עריכת עמוד ומקטעים",
+      "category": "page_management",
+      "categoryLabel": "ניהול עמודים",
+      "audience": "user",
+      "summary": "כניסה לעורך המקטעים: הזזת שכבות, עריכת תכנים והתאמת צבעים.",
+      "processStep": "בחירת עמוד ➔ כניסה לעורך ➔ עריכת מקטע בודד או שינוי סדר.",
+      "actionKey": "open_editor",
+      "badge": "עריכת דף",
+      "icon": "Edit3",
+      "ctaText": "פתח עורך עמוד ◀",
+      "tags": [
+        "עריכה", "עורך", "עריכת עמוד", "ערוך דף", "editor", "מקטעים", "sections",
+        "פתיחת עורך", "שינוי תוכן", "עיצוב עמוד"
+      ],
+      "targetLayout": "accordion_morph",
+      "guestAvailable": false,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_duplicate_page",
+      "name": "duplicatePage",
+      "title": "שכפול עמוד קיים",
+      "category": "page_management",
+      "categoryLabel": "ניהול עמודים",
+      "audience": "user",
+      "summary": "שכפול מהיר של עמוד שלם כולל כל המקטעים, העיצובים והגדרות ה-SEO.",
+      "processStep": "בחירת עמוד מקור ➔ שכפול נתונים מלא ➔ שמירה כטיוטה.",
+      "actionKey": "duplicate_page",
+      "badge": "שכפול",
+      "icon": "Copy",
+      "ctaText": "שכפל עמוד ◀",
+      "tags": [
+        "שכפול", "duplicate", "העתקה", "להעתיק עמוד", "עותק", "קופי", "שכפול דף"
+      ],
+      "targetLayout": "spotlight_stage",
+      "guestAvailable": false,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_toggle_publish_page",
+      "name": "togglePublishPage",
+      "title": "פרסום / הורדה מאוויר (Toggle)",
+      "category": "page_management",
+      "categoryLabel": "ניהול עמודים",
+      "audience": "user",
+      "summary": "שינוי סטטוס עמוד בלחיצה אחת בין מצב טיוטה פרטית למצב מפורסם ברשת.",
+      "processStep": "לחיצה על סטטוס העמוד ➔ עדכון Firestore ➔ סנכרון דומיין חי.",
+      "actionKey": "toggle_publish",
+      "badge": "סטטוס פרסום",
+      "icon": "Globe",
+      "ctaText": "עדכן סטטוס ◀",
+      "tags": [
+        "פרסום", "publish", "טיוטה", "draft", "העלאה לאוויר", "הורדה מהאוויר", "סטטוס"
+      ],
+      "targetLayout": "spotlight_stage",
+      "guestAvailable": false,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_ai_live_page_builder",
+      "name": "aiLivePageBuilderModal",
+      "title": "מחולל עמודים חי ב-AI Studio",
+      "category": "ai_generation",
+      "categoryLabel": "בינה מלאכותית",
+      "audience": "both",
+      "summary": "יצירת עמודים ורעיונות שיווקיים שלמים מתוך פרומפט והתאמה עמוקה ל-Brand DNA.",
+      "processStep": "הזנת רעיון בשפה חופשית ➔ הזרקת ה-DNA של הטננט ➔ יצירת עמוד מלא תוך שניות.",
+      "actionKey": "open_ai_builder",
+      "badge": "KosAi Studio",
+      "icon": "Sparkles",
+      "ctaText": "הפעל יוצר AI ◀",
+      "tags": [
+        "ai", "בינה מלאכותית", "מחולל", "גנרטור", "יוצר עמודים", "kosai", "ai builder",
+        "יצירה אוטומטית", "פרומפט", "רעיון שיווקי", "marketing ideas"
+      ],
+      "targetLayout": "accordion_morph",
+      "guestAvailable": true,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_brand_marketing_ideas",
+      "name": "continuousMarketingIdeasDrawer",
+      "title": "הצעות שיווקיות רציפות מה-DNA",
+      "category": "ai_generation",
+      "categoryLabel": "בינה מלאכותית",
+      "audience": "user",
+      "summary": "שליפת רעיונות לקמפיינים ודפי נחיתה חדשים המותאמים בדיוק לשפת המותג של הטננט.",
+      "processStep": "סריקת BrandDNA ➔ יצירת 4 הצעות ערך ממוקדות ➔ שיגור לבנייה מהירה.",
+      "actionKey": "open_marketing_ideas",
+      "badge": "רעיונות שיווק",
+      "icon": "Lightbulb",
+      "ctaText": "קבל רעיונות ◀",
+      "tags": [
+        "רעיונות", "שיווק", "קמפיין", "השראה", "marketing", "marketing ideas", "רעיונות שיווקיים"
+      ],
+      "targetLayout": "spotlight_stage",
+      "guestAvailable": false,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_koseo_power_engin",
+      "name": "openSeoPowerEngin",
+      "title": "KoSeoPowerEngin: קונסול ואנליטיקס",
+      "category": "seo_geo",
+      "categoryLabel": "קידום ו-SEO",
+      "audience": "user",
+      "summary": "לוח בקרה מרכזי לגוגל סרצ׳ קונסול, אנליטיקס 4 ומנוע קידום GEO לדומיין וסאב-דומיינים.",
+      "processStep": "לחיצה ➔ פתיחת מסך KoSeoPowerEngin ➔ סקירת ביצועי חיפוש והמרות.",
+      "actionKey": "open_seo_hub",
+      "badge": "SEO & Console",
+      "icon": "BarChart3",
+      "ctaText": "פתח KoSeo ◀",
+      "tags": [
+        "seo", "koseo", "גוגל קונסול", "search console", "אנליטיקס", "analytics", "קידום",
+        "דירוג", "טראפיק", "כניסות", "דומיין"
+      ],
+      "targetLayout": "glass_flip_overlay",
+      "guestAvailable": false,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_url_shortener_modal",
+      "name": "urlShortenerModal",
+      "title": "קיצור קישורים ושיתוף מהיר",
+      "category": "seo_geo",
+      "categoryLabel": "קידום ו-SEO",
+      "audience": "both",
+      "summary": "הפקת קישור מקוצר וקליט לעמוד, הפקת ברקוד QR ושיתוף מהיר ב-WhatsApp.",
+      "processStep": "בחירת עמוד ➔ יצירת slug מקוצר ➔ העתקה לשיתוף.",
+      "actionKey": "open_shortener",
+      "badge": "שיתוף ו-QR",
+      "icon": "Share2",
+      "ctaText": "קצר ושתף ◀",
+      "tags": [
+        "קיצור קישור", "קישור קצר", "shortener", "qr", "שיתוף", "whatsapp", "וואטסאפ"
+      ],
+      "targetLayout": "spotlight_stage",
+      "guestAvailable": true,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_ensure_legal_pages",
+      "name": "ensureDefaultLegalPages",
+      "title": "הקמת עמודי תקנון, פרטיות ונגישות",
+      "category": "legal_infrastructure",
+      "categoryLabel": "תשתיות ומשפטי",
+      "audience": "both",
+      "summary": "סנכרון ויצירה אוטומטית של עמודי חובה משפטיים: תנאי שימוש, מדיניות פרטיות והצהרת נגישות.",
+      "processStep": "שאיבת נתוני חברה מה-DNA ➔ יצירת עמודי תקנון מותאמים ➔ פרסום באתר.",
+      "actionKey": "ensure_legal_pages",
+      "badge": "משפטי ונגישות",
+      "icon": "ShieldCheck",
+      "ctaText": "סנכרן עמודי חובה ◀",
+      "tags": [
+        "תקנון", "תנאי שימוש", "פרטיות", "מדיניות פרטיות", "נגישות", "הצהרת נגישות",
+        "legal", "privacy", "terms", "עמודי חובה"
+      ],
+      "targetLayout": "spotlight_stage",
+      "guestAvailable": true,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_convert_to_video",
+      "name": "convertToVideoStudio",
+      "title": "המרה לסטודיו וידאו ומשפכים (Video Funnel)",
+      "category": "page_management",
+      "categoryLabel": "ניהול עמודים",
+      "audience": "user",
+      "summary": "המרה אוטומטית של תכני העמוד למשפך וידאו אינטראקטיבי ורילס ב-Video Studio.",
+      "processStep": "בחירת עמוד ➔ שליחת מקטעים ל-Studio ➔ הפקת וידאו אינטראקטיבי.",
+      "actionKey": "convert_to_video",
+      "badge": "וידאו ומשפך",
+      "icon": "Film",
+      "ctaText": "המר לווידאו ◀",
+      "tags": [
+        "וידאו", "video", "המרה", "סטודיו וידאו", "משפך", "funnel", "רילס", "סטורי"
+      ],
+      "targetLayout": "spotlight_stage",
+      "guestAvailable": false,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_explore_blueprints",
+      "name": "pageBlueprintsCatalog",
+      "title": "קטלוג תבניות פרימיום מובנות",
+      "category": "page_management",
+      "categoryLabel": "תבניות ודוגמאות",
+      "audience": "both",
+      "summary": "סקירה ובחירה מתוך 5 תבניות מוכחות: משפך מכירה, GEO מקומי, מאמר סמכות, קהילה וקמפיין.",
+      "processStep": "סקירת התבניות ➔ תצוגה מקדימה מלאה ➔ שכפול והתאמה בלחיצה.",
+      "actionKey": "view_blueprints",
+      "badge": "תבניות מנצחות",
+      "icon": "Layers",
+      "ctaText": "גלה תבניות ◀",
+      "tags": [
+        "תבניות", "בלופרינט", "blueprints", "דוגמאות", "דפי נחיתה מוכנים", "משפכים"
+      ],
+      "targetLayout": "spotlight_stage",
+      "guestAvailable": true,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_kesher_checkout_leads",
+      "name": "kesherCheckoutLeadBridge",
+      "title": "איסוף לידים וסליקה מהירה (קשר)",
+      "category": "legal_infrastructure",
+      "categoryLabel": "מסחר והמרות",
+      "audience": "both",
+      "summary": "המרת כל אינטראקציה לנכס: איסוף ליד מאומת, סליקה מיידית או תשלום ישיר ללא חיכוך.",
+      "processStep": "לחיצת לקוח ➔ פתיחת חלון קשר ➔ שידור מאובטח ל-CRM וסליקה.",
+      "actionKey": "submit_lead",
+      "badge": "המרות ומכירות",
+      "icon": "CreditCard",
+      "ctaText": "בצע אינטראקציה ◀",
+      "tags": [
+        "סליקה", "לידים", "קשר", "תשלום", "הזמנה", "רכישה", "checkout", "crm"
+      ],
+      "targetLayout": "spotlight_stage",
+      "guestAvailable": true,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_brand_dna_sync",
+      "name": "syncPageWithBrandDna",
+      "title": "סנכרון מיידי עם ה-Brand DNA",
+      "category": "ai_generation",
+      "categoryLabel": "מיתוג ו-DNA",
+      "audience": "user",
+      "summary": "הזרקת צבעי המותג, הלוגו, הטון השיווקי והסלוגן ישירות לכל מקטעי העמוד בלחיצה אחת.",
+      "processStep": "טעינת פרופיל מותג ➔ החלת צבעים ופונטים ➔ סנכרון תמונות ומסרים.",
+      "actionKey": "sync_brand_dna",
+      "badge": "סנכרון מותג",
+      "icon": "Palette",
+      "ctaText": "סנכרן מותג ◀",
+      "tags": [
+        "מיתוג", "brand dna", "צבעים", "לוגו", "שפת מותג", "עיצוב אוטומטי"
+      ],
+      "targetLayout": "spotlight_stage",
+      "guestAvailable": false,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_style_presets_selector",
+      "name": "pageStylePresetsSelector",
+      "title": "החלפת אטמוספירת סגנון (5 Style Presets)",
+      "category": "page_management",
+      "categoryLabel": "סגנון ותצוגה",
+      "audience": "user",
+      "summary": "החלפה חיה בין 5 סגנונות עיצוב ואטמוספירה: סייבר ניאון, יוקרה שקטה, קלין מינימל, אמרלד עמוק ו-ולווט קינטי.",
+      "processStep": "בחירת פריסט ➔ עדכון פריסת המקטעים ➔ תצוגה מקדימה מיידית.",
+      "actionKey": "style_preset_picker",
+      "badge": "5 סגנונות",
+      "icon": "Sliders",
+      "ctaText": "החלף סגנון ◀",
+      "tags": [
+        "סגנון", "presets", "עיצוב", "theme", "לילה ויום", "אווירה", "אקורדיון"
+      ],
+      "targetLayout": "glass_flip_overlay",
+      "guestAvailable": false,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_live_preview_responsive",
+      "name": "liveResponsivePreview",
+      "title": "תצוגה מקדימה חיה ורספונסיבית",
+      "category": "page_management",
+      "categoryLabel": "תצוגה מקדימה",
+      "audience": "both",
+      "summary": "מעבר חלק בין תצוגת מובייל (9:16), טאבלט ומסך רחב עם עדכון נתונים בזמן אמת.",
+      "processStep": "בחירת מצב מסך ➔ בדיקת קריאות וחוויית משתמש ➔ בדיקת תקציב שטח.",
+      "actionKey": "preview_mobile",
+      "badge": "רספונסיביות",
+      "icon": "Smartphone",
+      "ctaText": "צפה במובייל ◀",
+      "tags": [
+        "תצוגה מקדימה", "preview", "mobile", "רספונסיבי", "מובייל 9:16", "דסקטופ"
+      ],
+      "targetLayout": "spotlight_stage",
+      "guestAvailable": true,
+      "userAvailable": true
+    },
+    {
+      "id": "fn_geo_seo_keywords",
+      "name": "geoSeoTargetingDrawer",
+      "title": "מיקוד מקומי ו-GEO SEO לעסקים",
+      "category": "seo_geo",
+      "categoryLabel": "קידום ו-SEO",
+      "audience": "user",
+      "summary": "התאמת עמודים לערים, אזורי שירות ומילות חיפוש ממוקדות לתוצאות ראשונות במפות ובגוגל.",
+      "processStep": "בחירת אזור פעילות ➔ הזרקת מילות מפתח לסלאג ולמקטעים ➔ עדכון תגיות Schema.",
+      "actionKey": "geo_seo_keywords",
+      "badge": "GEO מקומי",
+      "icon": "MapPin",
+      "ctaText": "הגדר אזור שירות ◀",
+      "tags": [
+        "geo", "מפות", "קידום מקומי", "ערים", "seo מקומי", "סניפים", "אזורי שירות"
+      ],
+      "targetLayout": "glass_flip_overlay",
+      "guestAvailable": false,
+      "userAvailable": true
+    }
+  ],
+  "sectionsCatalog": [
+    {
+      "type": "hero",
+      "title": "באנר ראשי (Hero Section)",
+      "category": "שער ומשיכה",
+      "description": "כותרת ענקית, מסר מפתח, כפתורי הנעה לפעולה ותמונת רקע או וידאו מרהיב."
+    },
+    {
+      "type": "features",
+      "title": "תכונות ויתרונות (Features)",
+      "category": "ערך מוסף",
+      "description": "כרטיסיות יתרונות ברורות עם אייקונים עשירים להמחשת הייחודיות של העסק."
+    },
+    {
+      "type": "servicesGrid",
+      "title": "גריד שירותים (Services Grid)",
+      "category": "מוצרים ושירותים",
+      "description": "רשת שירותים אינטראקטיבית עם תמחור, פירוט וכפתורי הזמנה ישירים."
+    },
+    {
+      "type": "statsBento",
+      "title": "בנטו מדדים והישגים (Stats Bento)",
+      "category": "סמכות והוכחה",
+      "description": "כרטיסי נתונים, מספרים מרשימים ומדדי הצלחה המבססים אמינות עסקית."
+    },
+    {
+      "type": "testimonials",
+      "title": "המלצות וביקורות לקוחות (Testimonials)",
+      "category": "סמכות והוכחה",
+      "description": "ציטוטי לקוחות אמיתיים, דירוגי כוכבים ותמונות משתמשים להגברת האמון."
+    },
+    {
+      "type": "faq",
+      "title": "שאלות נפוצות מונחות המרה (FAQ)",
+      "category": "הסרת התנגדויות",
+      "description": "אקורדיון שאלות ותשובות ממוקדות המפיגות חששות ומניעות לסגירה."
+    },
+    {
+      "type": "contact",
+      "title": "טופס יצירת קשר ופרטים (Contact)",
+      "category": "הנעה לפעולה",
+      "description": "טופס פנייה נקי, כפתור וואטסאפ מהיר ופרטי התקשרות מיידיים."
+    },
+    {
+      "type": "articlesListing",
+      "title": "מאמרים ופוסטים (Articles Listing)",
+      "category": "תוכן וסמכות",
+      "description": "רשימת מדריכים ומאמרים מקצועיים התורמים לקידום אורגני ולסמכות המותג."
+    },
+    {
+      "type": "beforeAfter",
+      "title": "השוואת לפני ואחרי (Before & After)",
+      "category": "המחשת תוצאות",
+      "description": "סליידר ויזואלי של השוואת תוצאות טיפול, שיפוץ או שיפור ביצועים."
+    },
+    {
+      "type": "pricing",
+      "title": "מחירון וחבילות (Pricing Plans)",
+      "category": "מסחר והמרות",
+      "description": "השוואת מסלולים, הדגשת חבילה מומלצת וכפתורי רכישה ישירים."
+    },
+    {
+      "type": "timer",
+      "title": "טיימר דחיפות והשקה (Urgency Countdown)",
+      "category": "הנעה לפעולה",
+      "description": "ספירה לאחור חיה למבצע מוגבל בזמן או להשקת מוצר/אירוע."
+    },
+    {
+      "type": "videoEngagement",
+      "title": "מעורבות וידאו אינטראקטיבית (Video Engagement)",
+      "category": "וידאו ומשפכים",
+      "description": "נגן וידאו מובנה עם כפתורי שכבה להשארת פרטים תוך כדי צפייה."
+    },
+    {
+      "type": "videoGallery",
+      "title": "גלריית סרטונים (Video Gallery)",
+      "category": "וידאו ומשפכים",
+      "description": "גלריית תכני וידאו קצרים הממחישים את פעילות המותג."
+    },
+    {
+      "type": "tiktokHero",
+      "title": "וידאו אנכי טיקטוק/רילס (TikTok Hero)",
+      "category": "וידאו ומשפכים",
+      "description": "מקטע אנכי מלא בסגנון סרטוני רשת קצרים המושך תשומת לב מירבית במובייל."
+    }
+  ],
+  "blueprintsCatalog": [
+    {
+      "id": "blueprint_sales_funnel",
+      "title": "עמוד מכירה והשקה (Sales & Checkout Funnel)",
+      "badge": "המרות גבוהות",
+      "sections": ["hero", "features", "pricing", "testimonials", "timer", "contact"],
+      "description": "מבנה מנצח לקמפיין מכירות, השקת מוצר או חבילת שירותים עם טיימר וסליקה."
+    },
+    {
+      "id": "blueprint_local_geo",
+      "title": "עמוד שירות מקומי ו-SEO (Local Geo Authority)",
+      "badge": "קידום מקומי",
+      "sections": ["hero", "servicesGrid", "statsBento", "testimonials", "contact"],
+      "description": "עמוד מותאם לערים ואזורי שירות עם דגש על חיוג מהיר ודירוג לקוחות מקומיים."
+    },
+    {
+      "id": "blueprint_knowledge_hub",
+      "title": "עמוד מאמר ידע וסמכות (Knowledge & Authority)",
+      "badge": "סמכות ותוכן",
+      "sections": ["hero", "articlesListing", "statsBento", "faq", "contact"],
+      "description": "עמוד תוכן עמוק לביסוס מעמד המומחה בתחום עם מגנט לידים להורדה."
+    },
+    {
+      "id": "blueprint_community_hub",
+      "title": "עמוד קהילה והרשמה (Community Hub)",
+      "badge": "מעורבות קהילתית",
+      "sections": ["hero", "features", "videoGallery", "testimonials", "contact"],
+      "description": "מרכז קהילתי המציג מפגשים, תכנים בלעדיים וטופס הצטרפות מהיר."
+    },
+    {
+      "id": "blueprint_crowdfunding_campaign",
+      "title": "עמוד קמפיין וגיוס משאבים (Campaign & Giving)",
+      "badge": "גיוס והשפעה",
+      "sections": ["hero", "statsBento", "videoEngagement", "pricing", "faq", "contact"],
+      "description": "מסלול תרומות והשקעה עם סרגל יעד דינמי וטופס הצטרפות שקוף."
+    }
+  ]
+}

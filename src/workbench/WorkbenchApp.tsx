@@ -1,0 +1,753 @@
+import React, { Suspense, useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { 
+  Sparkles, Grid, X, Check, Lock, Edit3, User, LogOut, Sun, Moon,
+  Mail, Bot, ShoppingBag, CreditCard, MessageSquare, Layers, BookOpen,
+  Film, Layout, BarChart3, Image, Database, ShieldCheck, ChevronLeft,
+  ArrowUpRight, HardDrive
+} from 'lucide-react';
+import { Sidebar } from './components/Sidebar';
+import { KosTopNav } from './components/KosTopNav';
+import { REGISTERED_MODULES } from './moduleRegistry';
+import { ModuleErrorBoundary } from './components/ModuleErrorBoundary';
+import { ModuleLoadingFallback } from './components/ModuleLoadingFallback';
+import { useSystemConnection } from '../core/connection/SystemConnectionContext';
+import { AuthModal } from '../components/Auth/AuthModal';
+import { subscribeToAuth, AuthState, fetchUserRole, isPlatformAdminEmail, getCachedUserRole, logoutUser } from '../services/firebaseAuth';
+import { KosNevModal } from '../components/Navigation/KosNevModal';
+import { CapabilitySlot } from '../core/bridge/CapabilitySlot';
+
+// PublicPageView loaded lazily to isolate KosWebAi from shell
+const PublicPageView = React.lazy(() =>
+  import('../modules/KosWebAi').then((m) => ({ default: m.PublicPageView }))
+);
+
+const PublicVideoSeoPageView = React.lazy(() =>
+  import('../modules/KosTube').then((m) => ({ default: m.PublicVideoSeoPageView }))
+);
+
+const HomePage = React.lazy(() =>
+  import('../pages/HomePage').then((m) => ({ default: m.HomePage }))
+);
+
+import { PageBuilderRenderer } from '../modules/KosWebAi/PageBuilderRenderer';
+import { pageBuilderFirestore } from '../modules/KosWebAi/services/pageBuilderFirestore';
+import { PageBuilderConfig } from '../modules/KosWebAi/types/pageBuilder.types';
+import { KosWebAiFrontDock } from '../modules/KosWebAi';
+import { ROOT_TENANT_ID, RESERVED_TENANT_SUBDOMAINS, buildTenantAdminUrl } from '../core/tenant/tenantResolver';
+import { TenantCoreService } from '../core/tenant/tenantService';
+
+const WorkbenchRootHome: React.FC = () => {
+  const { db } = useSystemConnection();
+  const [homePage, setHomePage] = React.useState<PageBuilderConfig | null>(() => {
+    return pageBuilderFirestore.getHomePageSync(ROOT_TENANT_ID);
+  });
+  const [loading, setLoading] = React.useState(() => !homePage);
+
+  const loadHome = React.useCallback(async () => {
+    try {
+      const page = await pageBuilderFirestore.getHomePage(db, ROOT_TENANT_ID);
+      if (page) {
+        setHomePage(page);
+      }
+    } catch {
+      // keep existing cached page
+    } finally {
+      setLoading(false);
+    }
+  }, [db]);
+
+  React.useEffect(() => {
+    loadHome();
+    const handleHomeChange = (e: any) => {
+      const changed = e?.detail?.tenantId;
+      if (!changed || changed === ROOT_TENANT_ID) {
+        loadHome();
+      }
+    };
+    window.addEventListener('kosun_homepage_changed', handleHomeChange);
+    return () => window.removeEventListener('kosun_homepage_changed', handleHomeChange);
+  }, [loadHome]);
+
+  const activePage = homePage || pageBuilderFirestore.getHomePageSync(ROOT_TENANT_ID) || pageBuilderFirestore.createDefaultRootHomePage();
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white relative font-sans transition-colors duration-300" dir="rtl">
+      <PageBuilderRenderer config={activePage} />
+      <KosWebAiFrontDock pageId={activePage.pageId} />
+    </div>
+  );
+};
+
+export const WorkbenchApp: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const searchParams = new URLSearchParams(location.search);
+  const { purchasedModules, firebaseApp } = useSystemConnection();
+
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  
+  // Auth state for determining admin role
+  const [authState, setAuthState] = useState<AuthState>({
+    user: null, uid: null, email: null, displayName: null, photoURL: null,
+    role: 'viewer', isAuthenticated: false, isAnonymous: false, loading: true, error: null
+  });
+  
+  const isLocalEnv = typeof window !== 'undefined' && (
+    window.location.hostname === 'localhost' ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.endsWith('.local')
+  );
+
+  const [isAdmin, setIsAdmin] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const h = window.location.hostname;
+      if (h === 'localhost' || h === '127.0.0.1' || h.endsWith('.local')) {
+        return true;
+      }
+    }
+    return false;
+  });
+
+  // Day / Night Theme (Light Mode is Default)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => {
+    return (localStorage.getItem('kosun_theme') as 'light' | 'dark') || 'light';
+  });
+
+  useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    const handleThemeChange = (e: any) => {
+      const newTheme = e?.detail?.theme || (document.documentElement.classList.contains('dark') ? 'dark' : 'light');
+      setTheme(newTheme);
+    };
+    window.addEventListener('kosun_theme_changed', handleThemeChange);
+    return () => window.removeEventListener('kosun_theme_changed', handleThemeChange);
+  }, []);
+
+  const toggleTheme = () => {
+    const next = theme === 'light' ? 'dark' : 'light';
+    setTheme(next);
+    localStorage.setItem('kosun_theme', next);
+    localStorage.setItem('kosun_home_theme', next);
+    if (next === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    window.dispatchEvent(new CustomEvent('kosun_theme_changed', { detail: { theme: next } }));
+  };
+
+  useEffect(() => {
+    const handleOpenModules = () => {
+      setIsMenuOpen(true);
+    };
+    window.addEventListener('kosun_open_modules_menu', handleOpenModules);
+    return () => window.removeEventListener('kosun_open_modules_menu', handleOpenModules);
+  }, []);
+
+  useEffect(() => {
+    if (isLocalEnv) {
+      setIsAdmin(true);
+      return;
+    }
+    if (!firebaseApp) return;
+    const unsub = subscribeToAuth(firebaseApp, async (state) => {
+      setAuthState(state);
+      if (state.user && state.email) {
+        const role = await fetchUserRole(state.uid!, firebaseApp);
+        setIsAdmin(role === 'admin' || getCachedUserRole(state.uid!) === 'admin' || isPlatformAdminEmail(state.email));
+      } else {
+        setIsAdmin(false);
+      }
+    });
+    return () => unsub();
+  }, [firebaseApp, isLocalEnv]);
+
+  const isKnownModuleOrSystemRoute =
+    REGISTERED_MODULES.some((m) => location.pathname === m.route || location.pathname.startsWith(m.route + '/')) ||
+    ['/home', '/communities', '/together', '/crm-groups', '/media-gallery-hub', '/media-gallery'].some(
+      (p) => location.pathname === p || location.pathname.startsWith(p + '/')
+    );
+
+  const isDirectSlugPath =
+    !isKnownModuleOrSystemRoute &&
+    location.pathname.length > 1 &&
+    !location.pathname.slice(1).includes('/');
+
+  const isPublicPage =
+    isDirectSlugPath ||
+    location.pathname.startsWith('/p/') ||
+    location.pathname.startsWith('/to/') ||
+    location.pathname.startsWith('/tube/') ||
+    location.pathname.startsWith('/page/') ||
+    location.pathname.startsWith('/preview/') ||
+    location.pathname === '/kosvidio' ||
+    location.pathname.startsWith('/kosvidio/') ||
+    location.pathname.startsWith('/kosvidio-') ||
+    location.pathname === '/kosass' ||
+    location.pathname.startsWith('/kosass/') ||
+    location.pathname.startsWith('/kosass-') ||
+    location.pathname === '/kosinfo' ||
+    location.pathname.startsWith('/kosinfo/') ||
+    location.pathname.startsWith('/kosinfo-') ||
+    location.pathname === '/kosevent' ||
+    location.pathname.startsWith('/kosevent/') ||
+    location.pathname.startsWith('/kosevent-') ||
+    location.pathname === '/koscheckout' ||
+    location.pathname.startsWith('/koscheckout/') ||
+    location.pathname.startsWith('/koscheckout-') ||
+    location.pathname === '/koscommunity' ||
+    location.pathname.startsWith('/koscommunity/') ||
+    location.pathname.startsWith('/koscommunity-') ||
+    location.pathname === '/kosfunrise' ||
+    location.pathname.startsWith('/kosfunrise/') ||
+    location.pathname.startsWith('/kosfunrise-') ||
+    location.pathname === '/koscourse' ||
+    location.pathname.startsWith('/koscourse/') ||
+    location.pathname.startsWith('/koscourse-') ||
+    location.hash.startsWith('#/p/') ||
+    location.hash.startsWith('#/to/') ||
+    location.hash.startsWith('#/tube/') ||
+    location.hash.startsWith('#/kosvidio') ||
+    location.hash.startsWith('#/kosass') ||
+    location.hash.startsWith('#/kosinfo') ||
+    location.hash.startsWith('#/kosevent') ||
+    location.hash.startsWith('#/koscheckout') ||
+    location.hash.startsWith('#/koscommunity') ||
+    location.hash.startsWith('#/kosfunrise') ||
+    location.hash.startsWith('#/koscourse') ||
+    location.hash.startsWith('#/page/');
+
+  const isHomePage = location.pathname === '/';
+  const showSidebar = searchParams.get('sidebar') === 'true';
+
+  const isStandalone =
+    searchParams.get('mode') === 'live' ||
+    searchParams.get('standalone') === 'true' ||
+    isPublicPage;
+
+  // Module metadata: Hebrew label, English label, and dedicated icon
+  const MODULE_META_CONFIG: Record<string, {
+    hebrewName: string;
+    englishPrefix: string;
+    englishRest: string;
+    slogan?: string;
+    icon: React.ComponentType<{ className?: string }>;
+  }> = {
+    'KosSubscribed': {
+      hebrewName: 'מנויי תוכן, חבילות ומבחנים',
+      englishPrefix: 'KOS',
+      englishRest: 'Subscribed',
+      icon: CreditCard,
+    },
+    'kosun-board-composer': {
+      hebrewName: 'מחולל מערכות ולוחות בקרה',
+      englishPrefix: 'KOS',
+      englishRest: 'Board Composer',
+      icon: Layout,
+    },
+    'kosun-am': {
+      hebrewName: 'מערכת דיוור ואוטומציה',
+      englishPrefix: 'KOS',
+      englishRest: 'UN AM Mail',
+      icon: Mail,
+    },
+    'kosai-engine': {
+      hebrewName: 'מנוע בינה מלאכותית וסוכנים',
+      englishPrefix: 'KOS',
+      englishRest: 'AI Engine',
+      icon: Bot,
+    },
+    'KosBranding': {
+      hebrewName: 'מרכז זהות ומיתוג עסקי',
+      englishPrefix: 'KOS',
+      englishRest: 'Brand DNA',
+      icon: Sparkles,
+    },
+    'kesher-payments-hub': {
+      hebrewName: 'פתרונות סליקה ותשלומים',
+      englishPrefix: 'KOS',
+      englishRest: 'Pay Terminal',
+      icon: CreditCard,
+    },
+    'KosWhatsUp': {
+      hebrewName: 'אוטומציות ושירות WhatsApp',
+      englishPrefix: 'KOS',
+      englishRest: 'WhatsUp',
+      icon: MessageSquare,
+    },
+    'whatsapp-green-api-hub': {
+      hebrewName: 'אוטומציות ושירות WhatsApp',
+      englishPrefix: 'KOS',
+      englishRest: 'WhatsUp',
+      icon: MessageSquare,
+    },
+    'KosTogether': {
+      hebrewName: 'ניהול קהילות וסגמנטים CRM',
+      englishPrefix: 'KOS',
+      englishRest: 'Together CRM',
+      icon: Layers,
+    },
+    'ksf': {
+      hebrewName: 'מחולל טפסים ושאלונים שלביים',
+      englishPrefix: 'KOS',
+      englishRest: 'Smart Forms (KSF)',
+      icon: BookOpen,
+    },
+    'smart-form-builder': {
+      hebrewName: 'טפסים חכמים',
+      englishPrefix: 'KOS',
+      englishRest: 'Forms Studio',
+      icon: BookOpen,
+    },
+    'video-producer-studio': {
+      hebrewName: 'סטודיו הפקות וידאו ואווטאר',
+      englishPrefix: 'KOS',
+      englishRest: 'Video Studio',
+      icon: Film,
+    },
+    'db-connector-hub': {
+      hebrewName: 'מחולל אינטגרציות וחיבורים',
+      englishPrefix: 'KOS',
+      englishRest: 'Connector Hub',
+      icon: Database,
+    },
+    'client-platform': {
+      hebrewName: 'קליטת לקוחות ואונבורדינג',
+      englishPrefix: 'KOS',
+      englishRest: 'Client Platform',
+      icon: User,
+    },
+    'crm-analytics': {
+      hebrewName: 'ניתוח נתונים ואנליטיקס CRM',
+      englishPrefix: 'KOS',
+      englishRest: 'Analytics CRM',
+      icon: BarChart3,
+    },
+    'KosWebAi': {
+      hebrewName: 'KosWebBulider',
+      englishPrefix: 'KOS',
+      englishRest: 'WebBulider',
+      slogan: 'Building Your Digital Interaction',
+      icon: Layout,
+    },
+    'auth-portal': {
+      hebrewName: 'שער כניסה ואבטחה',
+      englishPrefix: 'KOS',
+      englishRest: 'Auth Portal',
+      icon: ShieldCheck,
+    },
+    'flow-player-engine': {
+      hebrewName: 'נגן תהליכים אינטראקטיבי',
+      englishPrefix: 'KOS',
+      englishRest: 'Flow Player',
+      icon: Film,
+    },
+    'KosCloudStore': {
+      hebrewName: 'כספת ענן ומדיה חכמה',
+      englishPrefix: 'KOS',
+      englishRest: 'CloudStore',
+      icon: HardDrive,
+    },
+    'media-gallery-hub': {
+      hebrewName: 'ניהול ספריית מדיה',
+      englishPrefix: 'KOS',
+      englishRest: 'Media Gallery',
+      icon: Image,
+    },
+    'db-collections-hub': {
+      hebrewName: 'סייר מאגרי נתונים',
+      englishPrefix: 'KOS',
+      englishRest: 'Data Hub',
+      icon: Database,
+    },
+    'ambassador-campaigns-hub': {
+      hebrewName: 'גיוס וקמפיינים לשגרירים',
+      englishPrefix: 'KOS',
+      englishRest: 'Ambassadors Hub',
+      icon: Sparkles,
+    },
+  };
+
+  // Usage stats state for dynamic ranking
+  const [moduleUsageStats, setModuleUsageStats] = useState<Record<string, number>>(() => {
+    try {
+      const stored = localStorage.getItem('kosun_module_usage_stats');
+      return stored ? JSON.parse(stored) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  // Filter modules: Admin sees all, Regular users see purchased modules (System modules strictly admin only)
+  const availableModules = REGISTERED_MODULES.filter(m => {
+    if (m.isSystemModule) return isAdmin;
+    return isAdmin || purchasedModules.includes(m.id);
+  });
+  
+  // Sort modules dynamically by frequency of use
+  const sortedModules = React.useMemo(() => {
+    return [...availableModules].sort((a, b) => {
+      const countA = moduleUsageStats[a.id] || 0;
+      const countB = moduleUsageStats[b.id] || 0;
+      if (countB !== countA) return countB - countA;
+      return a.name.localeCompare(b.name, 'he');
+    });
+  }, [availableModules, moduleUsageStats]);
+
+  // Extract active module ID from pathname
+  const activeModuleRoute = '/' + location.pathname.split('/')[1];
+  const activeModule = REGISTERED_MODULES.find(m => m.route === activeModuleRoute);
+  const activeModuleId = activeModule ? activeModule.id : null;
+
+  const handleNavigateToModule = (moduleId: string, route: string) => {
+    // Record usage dynamically
+    setModuleUsageStats((prev) => {
+      const updated = { ...prev, [moduleId]: (prev[moduleId] || 0) + 1 };
+      try {
+        localStorage.setItem('kosun_module_usage_stats', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+
+    setIsMenuOpen(false);
+    navigate(route);
+  };
+
+  if (isStandalone) {
+    return (
+      <div className="w-screen min-h-screen bg-slate-50 dark:bg-[#09090b] flex items-center justify-center p-0 m-0 text-slate-900 dark:text-white font-sans transition-colors duration-300" dir="rtl">
+        <main className="w-full min-h-screen">
+          <Routes>
+            <Route path="/kosass" element={<ModuleErrorBoundary moduleName="עמוד שירות KOSASS"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד שירות KOSASS" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosass/*" element={<ModuleErrorBoundary moduleName="עמוד שירות KOSASS"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד שירות KOSASS" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosass-:slug" element={<ModuleErrorBoundary moduleName="עמוד שירות KOSASS"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד שירות KOSASS" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosass/:slug" element={<ModuleErrorBoundary moduleName="עמוד שירות KOSASS"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד שירות KOSASS" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosvidio" element={<ModuleErrorBoundary moduleName="עמוד וידאו Kosvidio"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד וידאו Kosvidio" />}><PublicPageView slug="kosvidio" /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosvidio/*" element={<ModuleErrorBoundary moduleName="עמוד וידאו Kosvidio"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד וידאו Kosvidio" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosvidio-:slug" element={<ModuleErrorBoundary moduleName="עמוד וידאו Kosvidio"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד וידאו Kosvidio" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosvidio/:slug" element={<ModuleErrorBoundary moduleName="עמוד וידאו Kosvidio"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד וידאו Kosvidio" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            {/* Archive Direct Public Routes */}
+            <Route path="/kosinfo" element={<ModuleErrorBoundary moduleName="ארכיון תוכן KOSINFO"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון תוכן KOSINFO" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosinfo/*" element={<ModuleErrorBoundary moduleName="ארכיון תוכן KOSINFO"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון תוכן KOSINFO" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosinfo-:slug" element={<ModuleErrorBoundary moduleName="ארכיון תוכן KOSINFO"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון תוכן KOSINFO" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosinfo/:slug" element={<ModuleErrorBoundary moduleName="ארכיון תוכן KOSINFO"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון תוכן KOSINFO" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            <Route path="/kosevent" element={<ModuleErrorBoundary moduleName="ארכיון אירועים KOSEVENT"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון אירועים KOSEVENT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosevent/*" element={<ModuleErrorBoundary moduleName="ארכיון אירועים KOSEVENT"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון אירועים KOSEVENT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosevent-:slug" element={<ModuleErrorBoundary moduleName="ארכיון אירועים KOSEVENT"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון אירועים KOSEVENT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosevent/:slug" element={<ModuleErrorBoundary moduleName="ארכיון אירועים KOSEVENT"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון אירועים KOSEVENT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            <Route path="/koscheckout" element={<ModuleErrorBoundary moduleName="דפי סליקה KOSCHECKOUT"><Suspense fallback={<ModuleLoadingFallback moduleName="דפי סליקה KOSCHECKOUT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscheckout/*" element={<ModuleErrorBoundary moduleName="דפי סליקה KOSCHECKOUT"><Suspense fallback={<ModuleLoadingFallback moduleName="דפי סליקה KOSCHECKOUT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscheckout-:slug" element={<ModuleErrorBoundary moduleName="דפי סליקה KOSCHECKOUT"><Suspense fallback={<ModuleLoadingFallback moduleName="דפי סליקה KOSCHECKOUT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscheckout/:slug" element={<ModuleErrorBoundary moduleName="דפי סליקה KOSCHECKOUT"><Suspense fallback={<ModuleLoadingFallback moduleName="דפי סליקה KOSCHECKOUT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            <Route path="/koscommunity" element={<ModuleErrorBoundary moduleName="קהילות KOSCOMMUNITY"><Suspense fallback={<ModuleLoadingFallback moduleName="קהילות KOSCOMMUNITY" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscommunity/*" element={<ModuleErrorBoundary moduleName="קהילות KOSCOMMUNITY"><Suspense fallback={<ModuleLoadingFallback moduleName="קהילות KOSCOMMUNITY" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscommunity-:slug" element={<ModuleErrorBoundary moduleName="קהילות KOSCOMMUNITY"><Suspense fallback={<ModuleLoadingFallback moduleName="קהילות KOSCOMMUNITY" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscommunity/:slug" element={<ModuleErrorBoundary moduleName="קהילות KOSCOMMUNITY"><Suspense fallback={<ModuleLoadingFallback moduleName="קהילות KOSCOMMUNITY" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            <Route path="/kosfunrise" element={<ModuleErrorBoundary moduleName="קמפיין גיוס KOSFUNRISE"><Suspense fallback={<ModuleLoadingFallback moduleName="קמפיין גיוס KOSFUNRISE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosfunrise/*" element={<ModuleErrorBoundary moduleName="קמפיין גיוס KOSFUNRISE"><Suspense fallback={<ModuleLoadingFallback moduleName="קמפיין גיוס KOSFUNRISE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosfunrise-:slug" element={<ModuleErrorBoundary moduleName="קמפיין גיוס KOSFUNRISE"><Suspense fallback={<ModuleLoadingFallback moduleName="קמפיין גיוס KOSFUNRISE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosfunrise/:slug" element={<ModuleErrorBoundary moduleName="קמפיין גיוס KOSFUNRISE"><Suspense fallback={<ModuleLoadingFallback moduleName="קמפיין גיוס KOSFUNRISE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            <Route path="/koscourse" element={<ModuleErrorBoundary moduleName="קורסים KOSCOURSE"><Suspense fallback={<ModuleLoadingFallback moduleName="קורסים KOSCOURSE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscourse/*" element={<ModuleErrorBoundary moduleName="קורסים KOSCOURSE"><Suspense fallback={<ModuleLoadingFallback moduleName="קורסים KOSCOURSE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscourse-:slug" element={<ModuleErrorBoundary moduleName="קורסים KOSCOURSE"><Suspense fallback={<ModuleLoadingFallback moduleName="קורסים KOSCOURSE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscourse/:slug" element={<ModuleErrorBoundary moduleName="קורסים KOSCOURSE"><Suspense fallback={<ModuleLoadingFallback moduleName="קורסים KOSCOURSE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            <Route path="/p/:slug" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/p/*" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/to/:slug" element={<ModuleErrorBoundary moduleName="תצוגת קהילה"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגת קהילה" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/to/*" element={<ModuleErrorBoundary moduleName="תצוגת קהילה"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגת קהילה" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/page/:slug" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/page/*" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/preview/:slug" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/preview/*" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            {REGISTERED_MODULES.map((module) => {
+              const Component = module.component;
+              return (
+                <Route
+                  key={module.id}
+                  path={`${module.route}/*`}
+                  element={
+                    <ModuleErrorBoundary moduleName={module.name}>
+                      <Suspense fallback={<ModuleLoadingFallback moduleName={module.name} />}>
+                        <Component />
+                      </Suspense>
+                    </ModuleErrorBoundary>
+                  }
+                />
+              );
+            })}
+            {/* KosCloudStore legacy alias redirects */}
+            <Route path="/media-gallery-hub/*" element={<Navigate to="/KosCloudStore" replace />} />
+            <Route path="/media-gallery/*" element={<Navigate to="/KosCloudStore" replace />} />
+            {/* Direct public page slug (without /p/) */}
+            <Route
+              path="/:slug"
+              element={
+                <ModuleErrorBoundary moduleName="תצוגה ציבורית">
+                  <Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}>
+                    <PublicPageView />
+                  </Suspense>
+                </ModuleErrorBoundary>
+              }
+            />
+            <Route
+              path="/"
+              element={
+                <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center text-indigo-400 font-bold">טוען...</div>}>
+                  <WorkbenchRootHome />
+                </Suspense>
+              }
+            />
+          </Routes>
+        </main>
+      </div>
+    );
+  }
+
+  // Master Control Panel Guard: Strictly verify Master Admin for backoffice routes
+  const isBackofficeRoute = !isStandalone && !isHomePage && !isPublicPage;
+
+  if (isBackofficeRoute && authState.loading && !isLocalEnv) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0c] flex flex-col items-center justify-center p-4 text-center font-sans text-white" dir="rtl">
+        <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 border border-indigo-500/30 flex items-center justify-center text-indigo-400 animate-spin mb-4">
+          <Sparkles className="w-6 h-6" />
+        </div>
+        <p className="text-sm font-bold text-slate-300">מאמת הרשאות כניסה ללוח הבקרה...</p>
+      </div>
+    );
+  }
+
+  if (isBackofficeRoute && !isAdmin && !isLocalEnv) {
+    const email = (authState.user?.email || '').trim().toLowerCase();
+    const phone = authState.user?.phoneNumber || '';
+    const tenantByEmail = email ? TenantCoreService.findTenantForUser(email) : null;
+    const tenantByPhone = phone ? TenantCoreService.findTenantForUser(phone) : null;
+    const matchedTenant = tenantByEmail || tenantByPhone;
+
+    if (matchedTenant && matchedTenant.subdomain && !RESERVED_TENANT_SUBDOMAINS.includes(matchedTenant.subdomain.toLowerCase())) {
+      const targetUrl = buildTenantAdminUrl(matchedTenant.subdomain, matchedTenant.fullDomain);
+      window.location.replace(targetUrl);
+      return null;
+    }
+
+    return (
+      <div className="min-h-screen bg-[#0a0a0c] flex flex-col items-center justify-center p-4 text-center font-sans relative selection:bg-indigo-500 selection:text-white" dir="rtl">
+        <div className="w-full max-w-md bg-slate-900/90 border border-slate-800/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center mx-auto shadow-lg shadow-amber-500/10">
+            <Lock className="w-8 h-8" />
+          </div>
+
+          <div className="space-y-2">
+            <h1 className="text-xl font-black text-white">
+              לוח הבקרה של המסטר מוגן
+            </h1>
+            <p className="text-xs text-slate-400 leading-relaxed">
+              הכניסה ללוח הבקרה בנתיב הראשי של המערכת שמורה אך ורק למנהל המערכת הראשי (Master Admin).
+              משתמשים ולקוחות רשאים להיכנס אך ורק דרך הסאב-דומיין שלהם.
+            </p>
+          </div>
+
+          <div className="space-y-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsAuthModalOpen(true)}
+              className="w-full py-3 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs shadow-md transition cursor-pointer flex items-center justify-center gap-2"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              <span>התחברות כמנהל מערכת (Master)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                window.location.href = '/';
+              }}
+              className="w-full py-2.5 px-4 rounded-xl border border-slate-700 hover:bg-slate-800 text-slate-300 font-bold text-xs transition cursor-pointer"
+            >
+              חזרה לעמוד הבית הציבורי
+            </button>
+          </div>
+        </div>
+
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          firebaseApp={firebaseApp}
+          title="התחברות מנהל מערכת"
+          subtitle="אימות זהות מסטר עבור לוח הבקרה הראשי"
+          onSuccess={() => setIsAuthModalOpen(false)}
+        />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-50 dark:bg-[#0a0a0c] text-slate-900 dark:text-slate-100 relative font-sans transition-colors duration-300" dir="rtl">
+      {/* 2026 Kosun Standard: 100% Headerless - Zero Top Header */}
+
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-[#0a0a0c] relative transition-colors duration-300">
+          <Routes>
+            <Route
+              path="/"
+              element={
+                <Suspense fallback={<div className="min-h-screen bg-slate-900 flex items-center justify-center text-indigo-400 font-bold">טוען...</div>}>
+                  <WorkbenchRootHome />
+                </Suspense>
+              }
+            />
+            <Route path="/home" element={<Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center text-indigo-500 font-bold">טוען...</div>}><HomePage /></Suspense>} />
+            
+            <Route path="/kosass" element={<ModuleErrorBoundary moduleName="עמוד שירות KOSASS"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד שירות KOSASS" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosass/*" element={<ModuleErrorBoundary moduleName="עמוד שירות KOSASS"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד שירות KOSASS" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosass-:slug" element={<ModuleErrorBoundary moduleName="עמוד שירות KOSASS"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד שירות KOSASS" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosass/:slug" element={<ModuleErrorBoundary moduleName="עמוד שירות KOSASS"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד שירות KOSASS" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosvidio" element={<ModuleErrorBoundary moduleName="עמוד וידאו Kosvidio"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד וידאו Kosvidio" />}><PublicPageView slug="kosvidio" /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosvidio/*" element={<ModuleErrorBoundary moduleName="עמוד וידאו Kosvidio"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד וידאו Kosvidio" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosvidio-:slug" element={<ModuleErrorBoundary moduleName="עמוד וידאו Kosvidio"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד וידאו Kosvidio" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosvidio/:slug" element={<ModuleErrorBoundary moduleName="עמוד וידאו Kosvidio"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד וידאו Kosvidio" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            {/* Archive Direct Public Routes */}
+            <Route path="/kosinfo" element={<ModuleErrorBoundary moduleName="ארכיון תוכן KOSINFO"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון תוכן KOSINFO" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosinfo/*" element={<ModuleErrorBoundary moduleName="ארכיון תוכן KOSINFO"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון תוכן KOSINFO" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosinfo-:slug" element={<ModuleErrorBoundary moduleName="ארכיון תוכן KOSINFO"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון תוכן KOSINFO" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosinfo/:slug" element={<ModuleErrorBoundary moduleName="ארכיון תוכן KOSINFO"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון תוכן KOSINFO" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            <Route path="/kosevent" element={<ModuleErrorBoundary moduleName="ארכיון אירועים KOSEVENT"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון אירועים KOSEVENT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosevent/*" element={<ModuleErrorBoundary moduleName="ארכיון אירועים KOSEVENT"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון אירועים KOSEVENT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosevent-:slug" element={<ModuleErrorBoundary moduleName="ארכיון אירועים KOSEVENT"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון אירועים KOSEVENT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosevent/:slug" element={<ModuleErrorBoundary moduleName="ארכיון אירועים KOSEVENT"><Suspense fallback={<ModuleLoadingFallback moduleName="ארכיון אירועים KOSEVENT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            <Route path="/koscheckout" element={<ModuleErrorBoundary moduleName="דפי סליקה KOSCHECKOUT"><Suspense fallback={<ModuleLoadingFallback moduleName="דפי סליקה KOSCHECKOUT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscheckout/*" element={<ModuleErrorBoundary moduleName="דפי סליקה KOSCHECKOUT"><Suspense fallback={<ModuleLoadingFallback moduleName="דפי סליקה KOSCHECKOUT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscheckout-:slug" element={<ModuleErrorBoundary moduleName="דפי סליקה KOSCHECKOUT"><Suspense fallback={<ModuleLoadingFallback moduleName="דפי סליקה KOSCHECKOUT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscheckout/:slug" element={<ModuleErrorBoundary moduleName="דפי סליקה KOSCHECKOUT"><Suspense fallback={<ModuleLoadingFallback moduleName="דפי סליקה KOSCHECKOUT" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            <Route path="/koscommunity" element={<ModuleErrorBoundary moduleName="קהילות KOSCOMMUNITY"><Suspense fallback={<ModuleLoadingFallback moduleName="קהילות KOSCOMMUNITY" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscommunity/*" element={<ModuleErrorBoundary moduleName="קהילות KOSCOMMUNITY"><Suspense fallback={<ModuleLoadingFallback moduleName="קהילות KOSCOMMUNITY" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscommunity-:slug" element={<ModuleErrorBoundary moduleName="קהילות KOSCOMMUNITY"><Suspense fallback={<ModuleLoadingFallback moduleName="קהילות KOSCOMMUNITY" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscommunity/:slug" element={<ModuleErrorBoundary moduleName="קהילות KOSCOMMUNITY"><Suspense fallback={<ModuleLoadingFallback moduleName="קהילות KOSCOMMUNITY" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            <Route path="/kosfunrise" element={<ModuleErrorBoundary moduleName="קמפיין גיוס KOSFUNRISE"><Suspense fallback={<ModuleLoadingFallback moduleName="קמפיין גיוס KOSFUNRISE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosfunrise/*" element={<ModuleErrorBoundary moduleName="קמפיין גיוס KOSFUNRISE"><Suspense fallback={<ModuleLoadingFallback moduleName="קמפיין גיוס KOSFUNRISE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosfunrise-:slug" element={<ModuleErrorBoundary moduleName="קמפיין גיוס KOSFUNRISE"><Suspense fallback={<ModuleLoadingFallback moduleName="קמפיין גיוס KOSFUNRISE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/kosfunrise/:slug" element={<ModuleErrorBoundary moduleName="קמפיין גיוס KOSFUNRISE"><Suspense fallback={<ModuleLoadingFallback moduleName="קמפיין גיוס KOSFUNRISE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            <Route path="/koscourse" element={<ModuleErrorBoundary moduleName="קורסים KOSCOURSE"><Suspense fallback={<ModuleLoadingFallback moduleName="קורסים KOSCOURSE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscourse/*" element={<ModuleErrorBoundary moduleName="קורסים KOSCOURSE"><Suspense fallback={<ModuleLoadingFallback moduleName="קורסים KOSCOURSE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscourse-:slug" element={<ModuleErrorBoundary moduleName="קורסים KOSCOURSE"><Suspense fallback={<ModuleLoadingFallback moduleName="קורסים KOSCOURSE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/koscourse/:slug" element={<ModuleErrorBoundary moduleName="קורסים KOSCOURSE"><Suspense fallback={<ModuleLoadingFallback moduleName="קורסים KOSCOURSE" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/p/:slug" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/p/*" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/to/:slug" element={<ModuleErrorBoundary moduleName="תצוגת קהילה"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגת קהילה" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/to/*" element={<ModuleErrorBoundary moduleName="תצוגת קהילה"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגת קהילה" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/tube/:slug" element={<ModuleErrorBoundary moduleName="עמוד וידאו מקודם"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד וידאו מקודם" />}><PublicVideoSeoPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/tube/*" element={<ModuleErrorBoundary moduleName="עמוד וידאו מקודם"><Suspense fallback={<ModuleLoadingFallback moduleName="עמוד וידאו מקודם" />}><PublicVideoSeoPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/page/:slug" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/page/*" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/preview/:slug" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+            <Route path="/preview/*" element={<ModuleErrorBoundary moduleName="תצוגה ציבורית"><Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}><PublicPageView /></Suspense></ModuleErrorBoundary>} />
+
+            {/* Main Manager Dashboard Route */}
+            <Route
+              path="/dashboard"
+              element={
+                <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+                  <CapabilitySlot
+                    name="dashboard-renderer"
+                    props={{
+                      moduleId: 'overview',
+                      pageId: 'main-dashboard',
+                    }}
+                  />
+                </div>
+              }
+            />
+            <Route
+              path="/dashboard/*"
+              element={
+                <div className="p-4 sm:p-6 max-w-7xl mx-auto">
+                  <CapabilitySlot
+                    name="dashboard-renderer"
+                    props={{
+                      moduleId: 'overview',
+                      pageId: 'main-dashboard',
+                    }}
+                  />
+                </div>
+              }
+            />
+
+            {REGISTERED_MODULES.map((module) => {
+              const Component = module.component;
+              return (
+                <Route
+                  key={module.id}
+                  path={`${module.route}/*`}
+                  element={
+                    <ModuleErrorBoundary moduleName={module.name}>
+                      <Suspense fallback={<ModuleLoadingFallback moduleName={module.name} />}>
+                        <Component />
+                      </Suspense>
+                    </ModuleErrorBoundary>
+                  }
+                />
+              );
+            })}
+            {/* Communities & legacy alias routes */}
+            <Route path="/communities/*" element={<Navigate to="/crm-groups" replace />} />
+            <Route path="/together/*" element={<Navigate to="/crm-groups" replace />} />
+            <Route path="/crm-groups-hub/*" element={<Navigate to="/crm-groups" replace />} />
+            <Route path="/KosTogether/*" element={<Navigate to="/crm-groups" replace />} />
+
+            {/* KosCloudStore legacy alias redirects */}
+            <Route path="/media-gallery-hub/*" element={<Navigate to="/KosCloudStore" replace />} />
+            <Route path="/media-gallery/*" element={<Navigate to="/KosCloudStore" replace />} />
+            {/* Direct public page slug (without /p/) */}
+            <Route
+              path="/:slug"
+              element={
+                <ModuleErrorBoundary moduleName="תצוגה ציבורית">
+                  <Suspense fallback={<ModuleLoadingFallback moduleName="תצוגה ציבורית" />}>
+                    <PublicPageView />
+                  </Suspense>
+                </ModuleErrorBoundary>
+              }
+            />
+          </Routes>
+        </main>
+      </div>
+
+      <KosNevModal
+        isOpen={isMenuOpen}
+        onClose={() => setIsMenuOpen(false)}
+        activeModuleId={activeModuleId}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+      />
+
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        firebaseApp={firebaseApp}
+        title="התחברות למערכת"
+        subtitle="רענון הרשאות מנהל"
+        onSuccess={() => setIsAuthModalOpen(false)}
+      />
+    </div>
+  );
+};

@@ -1,0 +1,654 @@
+import React, { useState, useEffect } from 'react';
+import { PageBuilderConfig, ViewportMode, BuilderTab, SectionType } from './types/pageBuilder.types';
+import { eventBus } from '../../core/bridge/EventBus';
+
+
+
+import { SECTION_REGISTRY } from './registry/sectionRegistry';
+import { PageBuilderFloatingNav } from './components/PageBuilderFloatingNav';
+import { SectionNavigator } from './components/SectionNavigator';
+import { SectionContainer } from './components/SectionContainer';
+import { AddSectionModal } from './components/AddSectionModal';
+import { PageSettingsDrawer } from './components/PageSettingsDrawer';
+import { LivePreviewFrame } from './components/LivePreviewFrame';
+import { PublishPageModal } from './components/PublishPageModal';
+import { UrlShortenerModal } from './components/UrlShortenerModal';
+import { GeoSeoDrawer } from './components/GeoSeoDrawer';
+import { AiLivePageBuilderModal } from './components/AiLivePageBuilderModal';
+import { AiSectionDesignerModal } from './components/AiSectionDesignerModal';
+import { PageBlueprintsModal } from './components/PageBlueprintsModal';
+import { ContinuousMarketingIdeasDrawer } from './components/ContinuousMarketingIdeasDrawer';
+import { PageBuilderButton } from './ui/PageBuilderButton';
+import { useTenantScope } from '../../core/tenant/TenantScopeContext';
+import { useSystemConnection } from '../../core/connection/SystemConnectionContext';
+import { loadBrandDna } from '@/core';
+import { BrandDna } from '../../core/contracts';
+import { hydrateSectionWithBrandDna, resolveLiveBrandDna } from './services/brandSectionHydrator';
+import { syncSinglePageWithBrandDna } from './services/pageBrandSyncService';
+import { sanitizeSectionConfig } from './utils/sanitizeConfig';
+import { ArrowUp, ArrowDown, Plus, Sparkles, Layers, Eye, Edit3, Settings2, Globe, Share2, MapPin } from 'lucide-react';
+import { clsx } from 'clsx';
+
+interface PageBuilderEditorProps {
+  initialConfig: PageBuilderConfig;
+  onSaveConfig?: (config: PageBuilderConfig) => Promise<void> | void;
+  onClose?: () => void;
+  onGoToPagesList?: () => void;
+  onConvertToVideo?: () => void;
+}
+
+export const PageBuilderEditor: React.FC<PageBuilderEditorProps> = ({
+  initialConfig,
+  onSaveConfig,
+  onClose,
+  onGoToPagesList,
+  onConvertToVideo,
+}) => {
+  const [config, setConfig] = useState<PageBuilderConfig>(() => sanitizeSectionConfig(initialConfig));
+  const [activeTab, setActiveTab] = useState<BuilderTab>('edit');
+  const [viewportMode, setViewportMode] = useState<ViewportMode>('desktop');
+  const [openSectionId, setOpenSectionId] = useState<string | null>(
+    config.sectionOrder[0] || null
+  );
+
+  // Modals & Drawers
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isPublishModalOpen, setIsPublishModalOpen] = useState(false);
+  const [isShortenerModalOpen, setIsShortenerModalOpen] = useState(false);
+  const [isGeoDrawerOpen, setIsGeoDrawerOpen] = useState(false);
+  const [isAiBuilderModalOpen, setIsAiBuilderModalOpen] = useState(false);
+  const [isBlueprintsModalOpen, setIsBlueprintsModalOpen] = useState(false);
+  const [isMarketingDrawerOpen, setIsMarketingDrawerOpen] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  // Default to Day Mode (isDarkMode = false) according to Cashwan Branding Rule 4
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
+    const saved = localStorage.getItem('kosun_theme');
+    if (saved === 'dark') return true;
+    if (saved === 'light') return false;
+    return false; // Day Mode is default
+  });
+  const [aiSectionTarget, setAiSectionTarget] = useState<string | null>(null);
+
+  // Dynamic Tenant Branding integration
+  const { tenantId } = useTenantScope();
+  const { db } = useSystemConnection();
+  const [brandColor, setBrandColor] = useState<string>('#6366f1');
+  const [loadedBrandDna, setLoadedBrandDna] = useState<BrandDna | null>(() => resolveLiveBrandDna(null, tenantId));
+
+  useEffect(() => {
+    let isMounted = true;
+    loadBrandDna(db, tenantId)
+      .then((dna) => {
+        if (isMounted && dna) {
+          setLoadedBrandDna(dna);
+          if (dna?.designTokens?.primaryColor) {
+            setBrandColor(dna.designTokens.primaryColor);
+          }
+        }
+      })
+      .catch(() => {});
+    return () => {
+      isMounted = false;
+    };
+  }, [db, tenantId]);
+
+  useEffect(() => {
+    const unsubscribe = eventBus.subscribe('kosai:action', (data: any) => {
+      const { action, payload } = data;
+      if (action === 'ADD_SECTION' && payload) {
+        const newSectionId = `custom_${Date.now()}`;
+        setConfig(prev => ({
+          ...prev,
+          sectionOrder: [...prev.sectionOrder, newSectionId],
+          sections: {
+            ...prev.sections,
+            [newSectionId]: { ...payload, id: newSectionId }
+          }
+        }));
+      } else if (action === 'UPDATE_SECTION' && payload && payload.sectionId) {
+        setConfig(prev => ({
+          ...prev,
+          sections: {
+            ...prev.sections,
+            [payload.sectionId]: { ...prev.sections[payload.sectionId], ...payload.updates }
+          }
+        }));
+      } else if (action === 'UPDATE_GLOBAL_SETTINGS' && payload) {
+        setConfig(prev => ({
+          ...prev,
+          globalSettings: {
+            ...prev.globalSettings,
+            ...payload
+          }
+        }));
+      } else if (action === 'UPDATE_SEO' && payload) {
+        setConfig(prev => ({
+          ...prev,
+          seoSettings: {
+            ...prev.seoSettings,
+            ...payload
+          }
+        }));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    if (isDarkMode) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('kosun_theme', 'dark');
+      localStorage.setItem('kosun_home_theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('kosun_theme', 'light');
+      localStorage.setItem('kosun_home_theme', 'light');
+    }
+    window.dispatchEvent(new CustomEvent('kosun_theme_changed', { detail: { theme: isDarkMode ? 'dark' : 'light' } }));
+  }, [isDarkMode]);
+
+  useEffect(() => {
+    const handleGlobalThemeChange = (e: any) => {
+      const newTheme = e?.detail?.theme;
+      if (newTheme === 'dark') setIsDarkMode(true);
+      else if (newTheme === 'light') setIsDarkMode(false);
+    };
+    window.addEventListener('kosun_theme_changed', handleGlobalThemeChange);
+    return () => window.removeEventListener('kosun_theme_changed', handleGlobalThemeChange);
+  }, []);
+
+  useEffect(() => {
+    setConfig(sanitizeSectionConfig(initialConfig));
+    if (!openSectionId && initialConfig.sectionOrder.length > 0) {
+      setOpenSectionId(initialConfig.sectionOrder[0]);
+    }
+  }, [initialConfig]);
+
+  // Reorder handlers
+  const handleMoveUp = (index: number) => {
+    if (index === 0) return;
+    const newOrder = [...config.sectionOrder];
+    const temp = newOrder[index - 1];
+    newOrder[index - 1] = newOrder[index];
+    newOrder[index] = temp;
+    setConfig({ ...config, sectionOrder: newOrder });
+  };
+
+  const handleMoveDown = (index: number) => {
+    if (index === config.sectionOrder.length - 1) return;
+    const newOrder = [...config.sectionOrder];
+    const temp = newOrder[index + 1];
+    newOrder[index + 1] = newOrder[index];
+    newOrder[index] = temp;
+    setConfig({ ...config, sectionOrder: newOrder });
+  };
+
+  // Section update handler
+  const handleUpdateSectionData = (sectionId: string, updatedData: any) => {
+    const sanitized = sanitizeSectionConfig(updatedData);
+    setConfig({
+      ...config,
+      sections: {
+        ...config.sections,
+        [sectionId]: sanitized,
+      },
+    });
+  };
+
+  // Toggle Visibility
+  const handleToggleVisibility = (sectionId: string) => {
+    const current = config.sections[sectionId];
+    if (!current) return;
+    handleUpdateSectionData(sectionId, {
+      ...current,
+      visible: current.visible === false,
+    });
+  };
+
+  // Toggle Mobile Hidden
+  const handleToggleMobileHidden = (sectionId: string) => {
+    const current = config.sections[sectionId];
+    if (!current) return;
+    handleUpdateSectionData(sectionId, {
+      ...current,
+      mobileHidden: !current.mobileHidden,
+    });
+  };
+
+  // Delete Section
+  const handleDeleteSection = (sectionId: string) => {
+    if (confirm('האם למחוק אזור זה מהעמוד?')) {
+      const newOrder = config.sectionOrder.filter((id: string) => id !== sectionId);
+      const newSections = { ...config.sections };
+      delete newSections[sectionId];
+      setConfig({
+        ...config,
+        sectionOrder: newOrder,
+        sections: newSections,
+      });
+      if (openSectionId === sectionId) {
+        setOpenSectionId(newOrder[0] || null);
+      }
+    }
+  };
+
+  // Duplicate Section
+  const handleDuplicateSection = (sectionId: string) => {
+    const original = config.sections[sectionId];
+    if (!original) return;
+    const newId = `${original.type}_${Date.now()}`;
+    const duplicated = {
+      ...JSON.parse(JSON.stringify(original)),
+      id: newId,
+      anchorId: `${original.anchorId || original.type}_copy`,
+    };
+    const originalIndex = config.sectionOrder.indexOf(sectionId);
+    const newOrder = [...config.sectionOrder];
+    newOrder.splice(originalIndex + 1, 0, newId);
+
+    setConfig({
+      ...config,
+      sectionOrder: newOrder,
+      sections: {
+        ...config.sections,
+        [newId]: duplicated,
+      },
+    });
+    setOpenSectionId(newId);
+  };
+
+  // Add Section from registry
+  const handleAddSection = (type: SectionType) => {
+    const regDef = SECTION_REGISTRY[type];
+    if (!regDef) return;
+
+    const newId = `${type}_${Date.now()}`;
+    const liveDna = resolveLiveBrandDna(loadedBrandDna, tenantId);
+    const newSectionConfig = hydrateSectionWithBrandDna(regDef.defaultConfig, liveDna, type, tenantId);
+    newSectionConfig.id = newId;
+    newSectionConfig.anchorId = `${type}_${config.sectionOrder.length + 1}`;
+
+    setConfig({
+      ...config,
+      sectionOrder: [...config.sectionOrder, newId],
+      sections: {
+        ...config.sections,
+        [newId]: newSectionConfig,
+      },
+    });
+    setOpenSectionId(newId);
+  };
+
+  // Save handler
+  const handleSave = async () => {
+    setIsSaving(true);
+    if (onSaveConfig) {
+      await onSaveConfig(config);
+    }
+    setIsSaving(false);
+  };
+
+  // Toggle publish
+  const handleSavePublished = async (updated: PageBuilderConfig) => {
+    setConfig(updated);
+    if (onSaveConfig) {
+      await onSaveConfig(updated);
+    }
+  };
+
+    return (
+      <div className="flex flex-col min-h-screen bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white select-none transition-colors duration-300">
+      {/* Floating Action Dock & Navigation - Headerless 2026 Kosun Standard */}
+      <PageBuilderFloatingNav
+        config={config}
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        viewportMode={viewportMode}
+        setViewportMode={setViewportMode}
+        onSave={handleSave}
+        isSaving={isSaving}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenAddSection={() => setIsAddModalOpen(true)}
+        onOpenAiBuilder={() => setIsAiBuilderModalOpen(true)}
+        onOpenBlueprints={() => setIsBlueprintsModalOpen(true)}
+        onOpenMarketingIdeas={() => setIsMarketingDrawerOpen(true)}
+        onOpenPublish={() => setIsPublishModalOpen(true)}
+        onOpenShortener={() => setIsShortenerModalOpen(true)}
+        onOpenGeo={() => setIsGeoDrawerOpen(true)}
+        onGoToPagesList={onGoToPagesList}
+        onConvertToVideo={onConvertToVideo}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        tenantId={tenantId}
+        brandPrimaryColor={brandColor}
+      />
+
+      {/* Main Workspace based on Active Tab */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* TAB 1: Edit Mode */}
+        {activeTab === 'edit' && (
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left/Side: Navigator list */}
+            <SectionNavigator
+              sectionOrder={config.sectionOrder}
+              sections={config.sections}
+              openSectionId={openSectionId}
+              onSelectSection={(id) => setOpenSectionId(id)}
+              onAddSectionClick={() => setIsAddModalOpen(true)}
+              onMoveUp={handleMoveUp}
+              onMoveDown={handleMoveDown}
+              onToggleVisibility={handleToggleVisibility}
+            />
+
+            {/* Right/Main: Section Form Editors */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 lg:p-8 bg-slate-100/80 dark:bg-[#09090b] transition-colors duration-300">
+              <div className="max-w-4xl mx-auto flex flex-col gap-6">
+                {config.sectionOrder.map((sectionId, index) => {
+                  const sectionData = config.sections[sectionId];
+                  if (!sectionData) return null;
+                  const regDef = SECTION_REGISTRY[sectionData.type as SectionType];
+
+                  const isOpen = openSectionId === sectionId;
+
+                  return (
+                    <SectionContainer
+                      key={sectionId}
+                      sectionId={sectionId}
+                      sectionType={sectionData.type}
+                      title={sectionData.adminTitle || regDef?.name || sectionId}
+                      isOpen={isOpen}
+                      onToggleOpen={() => setOpenSectionId(isOpen ? null : sectionId)}
+                      sectionData={sectionData}
+                      visible={sectionData.visible !== false}
+                      mobileHidden={sectionData.mobileHidden}
+                      onToggleVisibility={() => handleToggleVisibility(sectionId)}
+                      onToggleMobileHidden={() => handleToggleMobileHidden(sectionId)}
+                      onUpdateSection={(id, data) => handleUpdateSectionData(id, data)}
+                      onDuplicate={() => handleDuplicateSection(sectionId)}
+                      onDelete={() => handleDeleteSection(sectionId)}
+                      onMoveUp={() => handleMoveUp(index)}
+                      onMoveDown={() => handleMoveDown(index)}
+                      onAiDesign={() => setAiSectionTarget(sectionId)}
+                      isFirst={index === 0}
+                      isLast={index === config.sectionOrder.length - 1}
+                    >
+                      {regDef && (
+                        <regDef.editorComponent
+                          config={sectionData}
+                          onChange={(updated) => handleUpdateSectionData(sectionId, updated)}
+                        />
+                      )}
+                    </SectionContainer>
+                  );
+                })}
+
+                {/* Add Section Big Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="w-full py-8 border-2 border-dashed border-slate-300 dark:border-slate-800 hover:border-indigo-500/60 rounded-3xl flex flex-col items-center justify-center gap-2 text-slate-500 dark:text-slate-400 hover:text-indigo-500 dark:hover:text-indigo-400 hover:bg-indigo-500/5 transition-all cursor-pointer group"
+                >
+                  <div className="w-12 h-12 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 group-hover:bg-indigo-600 group-hover:text-white flex items-center justify-center transition-colors shadow-sm dark:shadow-none">
+                    <Plus className="w-6 h-6" />
+                  </div>
+                  <span className="text-sm font-bold">הוסף אזור חדש לעמוד (Bento, Hero, Pricing, FAQ...)</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: Split Mode */}
+        {activeTab === 'split' && (
+          <div className="flex-1 flex overflow-hidden">
+            {/* Left: Quick Editors */}
+            <div className="w-full lg:w-[480px] border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c0c0e] overflow-y-auto p-4 flex flex-col gap-4 transition-colors duration-300">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+                <span className="text-xs font-bold text-slate-900 dark:text-white">עריכה מהירה</span>
+                <button
+                  type="button"
+                  onClick={() => setIsAddModalOpen(true)}
+                  className="text-xs text-indigo-500 dark:text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 font-bold flex items-center gap-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>הוסף אזור</span>
+                </button>
+              </div>
+
+              {config.sectionOrder.map((sectionId, index) => {
+                const sectionData = config.sections[sectionId];
+                if (!sectionData) return null;
+                const regDef = SECTION_REGISTRY[sectionData.type as SectionType];
+                const isOpen = openSectionId === sectionId;
+
+                return (
+                  <SectionContainer
+                    key={sectionId}
+                    sectionId={sectionId}
+                    sectionType={sectionData.type}
+                    title={(typeof sectionData.adminTitle === 'string' ? sectionData.adminTitle : '') || regDef?.name || sectionId}
+                    isOpen={isOpen}
+                    onToggleOpen={() => setOpenSectionId(isOpen ? null : sectionId)}
+                    sectionData={sectionData}
+                    visible={sectionData.visible !== false}
+                    mobileHidden={sectionData.mobileHidden}
+                    onToggleVisibility={() => handleToggleVisibility(sectionId)}
+                    onToggleMobileHidden={() => handleToggleMobileHidden(sectionId)}
+                    onUpdateSection={(id, data) => handleUpdateSectionData(id, data)}
+                    onDuplicate={() => handleDuplicateSection(sectionId)}
+                    onDelete={() => handleDeleteSection(sectionId)}
+                    onMoveUp={() => handleMoveUp(index)}
+                    onMoveDown={() => handleMoveDown(index)}
+                    onAiDesign={() => setAiSectionTarget(sectionId)}
+                    isFirst={index === 0}
+                    isLast={index === config.sectionOrder.length - 1}
+                  >
+                    {regDef && (
+                      <regDef.editorComponent
+                        config={sanitizeSectionConfig(sectionData)}
+                        onChange={(updated) => handleUpdateSectionData(sectionId, updated)}
+                      />
+                    )}
+                  </SectionContainer>
+                );
+              })}
+            </div>
+
+            {/* Right: Live Preview Frame */}
+            <div className="flex-1 bg-slate-200/60 dark:bg-slate-950 p-6 flex items-center justify-center overflow-auto transition-colors duration-300">
+              <LivePreviewFrame config={config} viewportMode={viewportMode} isDarkMode={isDarkMode} />
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: Preview Mode */}
+        {activeTab === 'preview' && (
+          <div className="flex-1 bg-slate-200/60 dark:bg-slate-950 p-4 sm:p-8 flex items-center justify-center overflow-auto transition-colors duration-300">
+            <LivePreviewFrame config={config} viewportMode={viewportMode} isDarkMode={isDarkMode} />
+          </div>
+        )}
+
+        {/* TAB 4: Reorder Layers */}
+        {activeTab === 'reorder' && (
+          <div className="flex-1 overflow-y-auto p-6 sm:p-8 bg-slate-100/80 dark:bg-[#09090b] transition-colors duration-300" dir="rtl">
+            <div className="max-w-2xl mx-auto flex flex-col gap-3">
+              {config.sectionOrder.map((sectionId, idx) => {
+                const sec = config.sections[sectionId];
+                const reg = SECTION_REGISTRY[sec?.type as SectionType];
+                return (
+                  <div
+                    key={sectionId}
+                    className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center justify-between text-right shadow-sm dark:shadow-none transition-colors duration-300"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="w-7 h-7 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-mono text-xs flex items-center justify-center">
+                        #{idx + 1}
+                      </span>
+                      <span className="font-bold text-slate-900 dark:text-white text-sm">
+                        {(typeof sec?.title === 'string' ? sec.title : '') || reg?.name || sectionId}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={idx === 0}
+                        onClick={() => handleMoveUp(idx)}
+                        className="p-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white text-xs flex items-center gap-1.5"
+                      >
+                        <ArrowUp className="w-3.5 h-3.5 text-slate-300" />
+                        <span>העלה</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={idx === config.sectionOrder.length - 1}
+                        onClick={() => handleMoveDown(idx)}
+                        className="p-2 px-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-30 text-white text-xs flex items-center gap-1.5"
+                      >
+                        <ArrowDown className="w-3.5 h-3.5 text-slate-300" />
+                        <span>הורד</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Modals & Drawers */}
+      <AddSectionModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAddSection={handleAddSection}
+      />
+
+      <PageSettingsDrawer
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        globalSettings={config.globalSettings}
+        onUpdateGlobalSettings={(updated) => {
+          setConfig((prev) => {
+            const next = { ...prev, globalSettings: updated };
+            if (onSaveConfig) onSaveConfig(next);
+            return next;
+          });
+        }}
+        seoSettings={config.seoSettings}
+        onUpdateSeoSettings={(updated) => {
+          setConfig((prev) => {
+            const next = { ...prev, seoSettings: updated };
+            if (onSaveConfig) onSaveConfig(next);
+            return next;
+          });
+        }}
+        onOpenGeoDrawer={() => setIsGeoDrawerOpen(true)}
+        pageTitle={config.pageTitle}
+        pageSections={Object.values(config.sections || {})}
+        sections={config.sections}
+        onUpdateSections={(updatedSections) => {
+          setConfig((prev) => {
+            const next = { ...prev, sections: updatedSections };
+            if (onSaveConfig) onSaveConfig(next);
+            return next;
+          });
+        }}
+        designSnapshots={config.designSnapshots}
+        onUpdateDesignSnapshots={(updatedSnapshots) => {
+          setConfig((prev) => {
+            const next = { ...prev, designSnapshots: updatedSnapshots };
+            if (onSaveConfig) onSaveConfig(next);
+            return next;
+          });
+        }}
+        onApplyGlobalOverride={(result) => {
+          setConfig((prev) => {
+            const next = {
+              ...prev,
+              globalSettings: result.globalSettings,
+              sections: result.sections,
+              designSnapshots: result.designSnapshots,
+            };
+            if (onSaveConfig) onSaveConfig(next);
+            return next;
+          });
+        }}
+      />
+
+      <PublishPageModal
+        isOpen={isPublishModalOpen}
+        onClose={() => setIsPublishModalOpen(false)}
+        config={config}
+        onTogglePublish={handleSavePublished}
+        onOpenShortener={() => setIsShortenerModalOpen(true)}
+      />
+
+      <UrlShortenerModal
+        isOpen={isShortenerModalOpen}
+        onClose={() => setIsShortenerModalOpen(false)}
+        config={config}
+        onSaveShortUrl={(shortUrl, shortSlug) =>
+          setConfig({ ...config, shortUrl, shortSlug })
+        }
+      />
+
+      <GeoSeoDrawer
+        isOpen={isGeoDrawerOpen}
+        onClose={() => setIsGeoDrawerOpen(false)}
+        config={config}
+        onSaveConfig={(updated) => setConfig(updated)}
+      />
+
+      <AiLivePageBuilderModal
+        isOpen={isAiBuilderModalOpen}
+        onClose={() => setIsAiBuilderModalOpen(false)}
+        onComplete={(generated) => {
+          setConfig(generated);
+          if (onSaveConfig) {
+            onSaveConfig(generated);
+          }
+        }}
+        onOpenMarketingDrawer={() => {
+          setIsAiBuilderModalOpen(false);
+          setIsMarketingDrawerOpen(true);
+        }}
+      />
+
+      <PageBlueprintsModal
+        isOpen={isBlueprintsModalOpen}
+        onClose={() => setIsBlueprintsModalOpen(false)}
+        onSelectBlueprint={(bpConfig) => {
+          setConfig(bpConfig);
+          if (onSaveConfig) {
+            onSaveConfig(bpConfig);
+          }
+        }}
+      />
+
+      <ContinuousMarketingIdeasDrawer
+        isOpen={isMarketingDrawerOpen}
+        onClose={() => setIsMarketingDrawerOpen(false)}
+        onSelectIdea={(prompt) => {
+          setIsMarketingDrawerOpen(false);
+          setIsAiBuilderModalOpen(true);
+        }}
+      />
+
+      {aiSectionTarget && config.sections[aiSectionTarget] && (
+        <AiSectionDesignerModal
+          isOpen={true}
+          onClose={() => setAiSectionTarget(null)}
+          sectionId={aiSectionTarget}
+          sectionType={config.sections[aiSectionTarget].type as SectionType}
+          currentConfig={config.sections[aiSectionTarget]}
+          allSections={config.sections}
+          sectionOrder={config.sectionOrder}
+          pageTitle={config.pageTitle}
+          onApplyDesign={(newConfig) => handleUpdateSectionData(aiSectionTarget, newConfig)}
+        />
+      )}
+      </div>
+    );
+};

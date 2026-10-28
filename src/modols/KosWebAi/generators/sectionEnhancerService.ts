@@ -1,0 +1,1033 @@
+import { SectionType } from '../types/pageBuilder.types';
+import { BrandDna } from '../../../core/contracts';
+import { resolveApiKey } from '../api/functionsApi';
+import { dispatchSectionEnhancementToKosai } from '../kosai/promptToKosai';
+import { resolveLiveBrandDna } from './pageGenerator';
+
+export interface SectionAiSuggestion {
+  id: string;
+  tab: 'brand' | 'page_context' | 'layout' | 'custom';
+  title: string;
+  description: string;
+  badge?: string;
+  iconName: string;
+  prompt: string;
+  previewChanges?: {
+    label: string;
+    value: string;
+  }[];
+}
+
+export interface SectionEnhancementResult {
+  success: boolean;
+  updatedConfig: any;
+  summaryOfChanges: string[];
+  isFromAi: boolean;
+  message?: string;
+}
+
+export const sectionEnhancerService = {
+  /**
+   * Generates intelligent, context-aware suggestions across 3 main dimensions:
+   * 1. Brand DNA (קולקציית המיתוג)
+   * 2. Whole Page Context (כלל תוכן ורצף העמוד)
+   * 3. Layout & Bento Design (עיצוב ופריסה)
+   */
+  getSuggestionsForSection(
+    sectionType: SectionType,
+    currentConfig: any,
+    brandDna?: BrandDna | null,
+    allSections?: Record<string, any>,
+    sectionOrder?: string[]
+  ): {
+    brandSuggestions: SectionAiSuggestion[];
+    pageContextSuggestions: SectionAiSuggestion[];
+    layoutSuggestions: SectionAiSuggestion[];
+  } {
+    const dna = resolveLiveBrandDna(brandDna);
+    const company = dna?.identity?.companyName || 'המותג שלך';
+    const slogan = dna?.identity?.slogan || '';
+    const uvp = dna?.audience?.mainUvp || '';
+    const tone = (dna?.voice as any)?.tone || dna?.voice?.powerWords?.join(', ') || 'יוקרתי, סמכותי ומניע לפעולה';
+    const phone = dna?.trust?.contactPhone || '';
+    const whatsapp = dna?.trust?.whatsappSupportNumber || '';
+
+    // Calculate position in page
+    const order = sectionOrder || [];
+    const currentIndex = currentConfig?.id ? order.indexOf(currentConfig.id) : -1;
+    const totalSections = order.length;
+    const isFirst = currentIndex === 0;
+    const isLast = currentIndex === totalSections - 1;
+
+    const precedingType = currentIndex > 0 ? allSections?.[order[currentIndex - 1]]?.type : null;
+    const followingType = currentIndex >= 0 && currentIndex < totalSections - 1 ? allSections?.[order[currentIndex + 1]]?.type : null;
+
+    // 1. BRAND DNA SUGGESTIONS
+    const brandSuggestions: SectionAiSuggestion[] = [
+      {
+        id: 'brand-tone-align',
+        tab: 'brand',
+        title: `התאמה מלאה לטון המותג (${tone.slice(0, 20)}...)`,
+        description: `שכתוב הכותרות, התיאורים והמסרים בהתאם לאופי המותג "${company}" והבטחת המותג: "${uvp || slogan || 'מובילות ומקצועיות'}".`,
+        badge: 'מיתוג עמוק',
+        iconName: 'Sparkles',
+        prompt: `שכתב ושדרג את הטקסטים והמסרים באזור זה כך שיתאימו בדיוק לקול המותג "${company}", תוך הדגשת ה-UVP: "${uvp || 'מובילות שירותית ואיכות ללא פשרות'}", בטון שיווקי אותנטי ומשכנע.`,
+        previewChanges: [
+          { label: 'קול מותג', value: tone },
+          { label: 'מיקוד ערך', value: uvp || 'איכות בלתי מתפשרת' },
+        ],
+      },
+      {
+        id: 'brand-trust-inject',
+        tab: 'brand',
+        title: 'הזרקת פרטי אמון וחיבור ישיר מהמיתוג',
+        description: `הטמעת מספרי שירות, אמון, וואטסאפ (${whatsapp || 'זמין'}) ותגיות אמינות מקולקציית המיתוג לתוך האזור.`,
+        badge: 'הגברת אמון',
+        iconName: 'ShieldCheck',
+        prompt: `הוסף או הדגש אלמנטים של אמון, ביטחון ופרטי קשר מאומתים של "${company}" (טלפון: ${phone || 'רשמי'}, וואטסאפ: ${whatsapp || 'פעיל'}), עם הוכחה חברתית ברורה.`,
+        previewChanges: [
+          { label: 'הוכחה חברתית', value: 'שילוב תגיות אמינות ופרטי קשר' },
+          { label: 'חיבור תקשורת', value: whatsapp ? `WhatsApp: ${whatsapp}` : 'מענה מהיר' },
+        ],
+      },
+      {
+        id: 'brand-persona-target',
+        tab: 'brand',
+        title: 'חידוד פנייה לקהל היעד והסרת חסמי המרה',
+        description: `התאמת המסר לקהל היעד המרכזי של ${company}, ומתן מענה חד להתלבטויות ונקודות כאב שכיחות.`,
+        badge: 'פנייה אישית',
+        iconName: 'Target',
+        prompt: `התאם את המסרים באזור זה כך שיפנו ישירות לקהל היעד של "${company}", ידגישו פתרון מהיר לבעיותיהם ויסירו חסמי החלטה.`,
+      },
+    ];
+
+    // 2. WHOLE PAGE CONTEXT SUGGESTIONS
+    const pageContextSuggestions: SectionAiSuggestion[] = [
+      {
+        id: 'page-flow-bridge',
+        tab: 'page_context',
+        title: isFirst
+          ? 'פתיחה מושכת שמניעה לגלילה בשאר העמוד'
+          : `גשר נרטיבי רציף (${precedingType ? `אחרי ${precedingType}` : 'רצף עמוד'})`,
+        description: `סנכרון של אזור זה עם הרצף הכולל של כל ${totalSections || 1} האזורים בעמוד למניעת נתק בחוויית הקריאה.`,
+        badge: 'זרימת תוכן',
+        iconName: 'Layers',
+        prompt: `שפר את אזור זה כך שישתלב ברצף ההגיוני של כלל העמוד (מיקום ${currentIndex + 1} מתוך ${totalSections}). שמור על מעבר טבעי ומזמין להמשך הגלישה.`,
+      },
+      {
+        id: 'page-cta-strengthen',
+        tab: 'page_context',
+        title: 'חיזוק הנעה לפעולה (CTA) לעבר יעד העמוד',
+        description: `כיוונון כפתורי הפעולה והקישורים באזור כדי שיובילו בצורה חלקה ליעד המרכזי של העמוד (עוגן, טופס, וואטסאפ).`,
+        badge: 'מקסום המרות',
+        iconName: 'Zap',
+        prompt: `חזק את ההנעה לפעולה (Call to Action) באזור זה, הפוך את הכפתורים למפתים, ברורים וממוקדים ביעד ההמרה המרכזי.`,
+      },
+      {
+        id: 'page-dedup-refine',
+        tab: 'page_context',
+        title: 'מניעת כפילויות מול שאר אזורי העמוד',
+        description: 'בדיקה שהמסר באזור זה מציע ערך ייחודי ואינו חוזר במילים דומות על פסקאות אחרות באתר.',
+        badge: 'תוכן מדויק',
+        iconName: 'Compass',
+        prompt: `רענן ודייק את התוכן באזור זה כדי להבטיח בידול מוחלט, תוכן עשיר ולא כפול מול יתר חלקי העמוד.`,
+      },
+    ];
+
+    // 3. LAYOUT & BENTO SUGGESTIONS
+    const layoutSuggestions: SectionAiSuggestion[] = [];
+
+    if (sectionType === 'hero' || sectionType === 'richContent' || sectionType === 'faq' || sectionType === 'contact' || sectionType === 'imageListing' || sectionType === 'videoGallery' || sectionType === 'timer' || sectionType === 'livePosts' || sectionType === 'kosvidio' || sectionType === 'mainContent' || sectionType === 'videoEngagement' || sectionType === 'kosvidioGallery') {
+      layoutSuggestions.push(
+        {
+          id: `${sectionType}-layout-feminine`,
+          tab: 'layout',
+          title: 'א. פריסה בסגנון נשי (רכה ואלגנטית)',
+          description: 'קווים מעוגלים, כפתורי קפסולה, גווני רוז-גולד ושמנת ותמונת בוטיק קשתית.',
+          badge: 'סגנון נשי',
+          iconName: 'Sparkles',
+          prompt: 'עצב את האזור בפריסה בסגנון נשי (feminine) רכה ואלגנטית עם כפתורי קפסולה ומסגרת קשתית.',
+        },
+        {
+          id: `${sectionType}-layout-masculine`,
+          tab: 'layout',
+          title: 'ב. פריסה בסגנון גברי (עוצמתית ודומיננטית)',
+          description: 'טיפוגרפיית ענק מודגשת, פחם וזהב מתכתי, כפתורים רחבים ומסגרת פלדה.',
+          badge: 'סגנון גברי',
+          iconName: 'ShieldCheck',
+          prompt: 'עצב את האזור בפריסה בסגנון גברי (masculine) עוצמתית עם כותרות ענק וניגודיות כהה.',
+        },
+        {
+          id: `${sectionType}-layout-bento`,
+          tab: 'layout',
+          title: 'ג. פריסה עכשווית (הפריסה הקיימת)',
+          description: 'עיצוב מודרני ומאוזן עם טיפוגרפיה נקייה, כרטיסים מעוצבים ואווירת Mesh Glow.',
+          badge: 'מומלץ KOSUN',
+          iconName: 'Layers',
+          prompt: 'הפוך את האזור לפריסה עכשווית (standard / bento) עם כפתור פעולה מודגש וכרטיסי תוכן.',
+        },
+        {
+          id: `${sectionType}-layout-spiritual`,
+          tab: 'layout',
+          title: 'ד. פריסה רוחנית (הרמונית ושלווה)',
+          description: 'מרווחי נשימה, גווני מרווה וזהב הילה, ופורטל תמונה עגול מוקף הילה.',
+          badge: 'סגנון רוחני',
+          iconName: 'Compass',
+          prompt: 'עצב את האזור בפריסה רוחנית (spiritual) הרמונית ושלווה עם פורטל תמונה עגול וטבעות הילה.',
+        },
+        {
+          id: `${sectionType}-layout-sharp`,
+          tab: 'layout',
+          title: 'ה. פריסה חדה (ברוטליסטית ומדויקת)',
+          description: 'זוויות 90° ללא עיגול, מסגרות 2px חדות וצללים מוסטים בניגודיות גבוהה.',
+          badge: 'סגנון חד',
+          iconName: 'Zap',
+          prompt: 'עצב את האזור בפריסה חדה (sharp) אדריכלית עם זוויות ישרות וצללים קשים.',
+        },
+        {
+          id: `${sectionType}-layout-analytical`,
+          tab: 'layout',
+          title: 'ו. פריסה אנליטית (מבוססת נתונים ודיוק)',
+          description: 'גריד דשבורד טכנולוגי עם כרטיסי מדדים (KPIs), גווני ציאן ומסוף נתונים חי.',
+          badge: 'סגנון אנליטי',
+          iconName: 'Target',
+          prompt: 'עצב את האזור בפריסה אנליטית (analytical) מבוססת נתונים עם מדדי KPI ומסוף טלמטריה.',
+        }
+      );
+
+      if (sectionType === 'kosvidioGallery') {
+        layoutSuggestions.push(
+          {
+            id: 'kosvidio-gallery-spotlight',
+            tab: 'layout',
+            title: 'תצוגה א׳: וידאו מרכזי גדול ותחתיו כרטיסים (Spotlight Grid)',
+            description: 'נגן וידאו מרכזי גדול בראש האזור ומתחתיו כרטיסי וידאו קטנים המתחלפים בלחיצה.',
+            badge: 'מומלץ לערוץ תוכן',
+            iconName: 'Sparkles',
+            prompt: 'הגדר את פריסת גלריית הוידאו ל-spotlight-grid עם וידאו ראשי גדול ותחתיו כרטיסי משנה.',
+          },
+          {
+            id: 'kosvidio-gallery-stacked',
+            tab: 'layout',
+            title: 'תצוגה ב׳: רשימת סרטונים זה תחת זה (Stacked List)',
+            description: 'רשימה אנכית עשירה בפרטים עם תצוגה מקדימה וקישור ישיר לעמוד הסרטון המלא.',
+            badge: 'רשימה אנכית',
+            iconName: 'Layers',
+            prompt: 'הגדר את פריסת גלריית הוידאו ל-stacked-list ברשימה אנכית נקייה.',
+          },
+          {
+            id: 'kosvidio-gallery-horizontal',
+            tab: 'layout',
+            title: 'תצוגה ג׳: גלריה עם גלילה אופקית ללא גלישה (Horizontal Scroll)',
+            description: 'קרוסלת וידאו אופקית חלקה ותחומה ללא גלישת עמוד.',
+            badge: 'גלילה אופקית',
+            iconName: 'Compass',
+            prompt: 'הגדר את פריסת גלריית הוידאו ל-horizontal-scroll עם גלילה אופקית ללא גלישה.',
+          }
+        );
+      }
+    } else if (sectionType === 'pricing') {
+      layoutSuggestions.push(
+        {
+          id: 'pricing-layout-featured',
+          tab: 'layout',
+          title: 'הדגשת חבילת ה-VIP (Featured Tier)',
+          description: 'עיצוב 3 חבילות מחיר עם תגית "הכי פופולרי" ואפקט הדגשה מותאם אישית.',
+          badge: 'ממיר במיוחד',
+          iconName: 'Zap',
+          prompt: 'שדרג את מחירון החבילות כך שחבילת האמצע תהיה מסומנת כ-Featured עם תגית בולטת וכפתור מודגש.',
+        }
+      );
+    } else if (sectionType === 'tiktokHero') {
+      layoutSuggestions.push(
+        {
+          id: 'tiktok-hero-hook-viral',
+          tab: 'layout',
+          title: 'הוק ויראלי וכותרת קצבית בסגנון טיקטוק',
+          description: 'ניסוח כותרת קצרה, מסקרנת ובועטת שגורמת לעצור את הגלילה באופן מיידי.',
+          badge: 'ויראלי במיוחד',
+          iconName: 'Sparkles',
+          prompt: 'נסח כותרת הוק קצרה, מסקרנת וממגנטת בסגנון טיקטוק/רילס (2-4 מילים) שמעוררת סקרנות בלתי נשלטת, והתאם את תגית הוידאו.',
+        },
+        {
+          id: 'tiktok-hero-cta-boost',
+          tab: 'layout',
+          title: 'חיזוק הנעה לפעולה (CTA) לפתיחת מודאל הלידים',
+          description: 'כוונון טקסט הכפתור, אפקט הפולס ואייקון מושך מתוך ספריית Lucide.',
+          badge: 'מקסום המרות',
+          iconName: 'Zap',
+          prompt: 'שדרג את כפתור הפעולה (CTA) של אזור הטיקטוק למילים מניעות לפעולה ברורה, בחר אייקון Lucide מתאים והגדר כותרת מודאל מזמינה.',
+        },
+        {
+          id: 'tiktok-hero-card-brand',
+          tab: 'layout',
+          title: 'סנכרון כרטיס המותג הצף עם ה-Brand DNA',
+          description: 'התאמת תגית הכרטיס, הכותרת והסלוגן להבטחת המותג ולקהל היעד.',
+          badge: 'מיתוג מדויק',
+          iconName: 'Target',
+          prompt: 'עדכן את כרטיס המותג הצף מעל הוידאו עם תגית מותג יוקרתית, שם החברה והצעת הערך המרכזית (UVP).',
+        }
+      );
+    } else if (sectionType === 'eventRsvp') {
+      layoutSuggestions.push(
+        {
+          id: 'event-rsvp-full',
+          tab: 'layout',
+          title: 'פריסת אירוע מלאה (Waze + יומן + WhatsApp + מונה הגעה)',
+          description: 'הפעלת כל 3 הכרטיסיות, כפתורי אישור הגעה ומונה נוכחות חי.',
+          badge: 'מומלץ KOSUN',
+          iconName: 'Sparkles',
+          prompt: 'הפעל את כל הכרטיסיות (Waze, יומן, אוטומציית וואטסאפ), חזק את כפתורי אישור ההגעה וסנכרן עם מונה האורחים.',
+        },
+        {
+          id: 'event-rsvp-minimal',
+          tab: 'layout',
+          title: 'עיצוב מינימליסטי ממוקד הגעה מהירה',
+          description: 'מיקוד בניווט ישיר ל-Waze ואישור הגעה מהיר.',
+          badge: 'מינימליסטי',
+          iconName: 'Target',
+          prompt: 'הדגש את הניווט המהיר ל-Waze ואת אישור ההגעה המהיר בלחיצה אחת.',
+        }
+      );
+    } else if (sectionType === 'dynamicListing') {
+      layoutSuggestions.push(
+        {
+          id: 'dynamic-listing-bento',
+          tab: 'layout',
+          title: 'מעבר לפריסת Bento Showcase (כרטיס מוביל)',
+          description: 'כרטיס Spotlight רחב לפריט המוביל לצד כרטיסי משנה חכמים.',
+          badge: 'מומלץ KOSUN',
+          iconName: 'Sparkles',
+          prompt: 'הגדר את פריסת הליסטינג ל-bento-showcase עם הילת border-beam על הכרטיס המרכזי.',
+        },
+        {
+          id: 'dynamic-listing-carousel',
+          tab: 'layout',
+          title: 'מעבר לפריסת Snap Carousel (סליידר אופקי חלק)',
+          description: 'קרוסלת גרירה אופקית מודרנית ללא גלילה אנכית ארוכה.',
+          badge: 'סליידר חלק',
+          iconName: 'Layers',
+          prompt: 'הגדר את פריסת הליסטינג ל-snap-carousel עם חיצי ניווט ואינדיקטורים.',
+        },
+        {
+          id: 'dynamic-listing-editorial',
+          tab: 'layout',
+          title: 'מעבר לפריסת Editorial Magazine (מגזין ותמונה צפה)',
+          description: 'רשימה שורתית אלגנטית עם תמונה שמרחפת בריחוף סמן.',
+          badge: 'עיצוב מגזין',
+          iconName: 'Target',
+          prompt: 'הגדר את פריסת הליסטינג ל-editorial-list עם טיפוגרפיה גדולה ואפקט תמונה מרחפת.',
+        }
+      );
+    } else if (sectionType === 'futureContent2027') {
+      layoutSuggestions.push(
+        {
+          id: 'future-bento-switch',
+          tab: 'layout',
+          title: 'מעבר לפריסת בנטו מרחבי (Prism Bento)',
+          description: 'שדרוג למבנה בנטו עתיר עומק עם אריח ראווה, מדדים חיים וקרן אור פריזמטית.',
+          badge: 'מומלץ 2027',
+          iconName: 'Sparkles',
+          prompt: 'הגדר את פריסת האזור ל-prism-bento, חזק את תאורת ה-Mesh Glow והוסף מדדי צמיחה.',
+        },
+        {
+          id: 'future-kinetic-switch',
+          tab: 'layout',
+          title: 'מעבר לפריסת מגזין קינטי (Kinetic Editorial)',
+          description: 'טיפוגרפיה מונומנטלית, מסלול גלילה אופקי אינרציאלי ותקציר קולי מבוסס AI.',
+          badge: 'מגזין יוקרה',
+          iconName: 'Layers',
+          prompt: 'הגדר את פריסת האזור ל-kinetic-editorial עם גלילה אופקית חלקה, מספור מונוספייס ותקציר שמע.',
+        },
+        {
+          id: 'future-islands-switch',
+          tab: 'layout',
+          title: 'מעבר לפריסת איים צפים (Floating Islands)',
+          description: 'כרטיסים מרחפים בעלי פיזיקת קפיצים עם מגירת חשיפה מהירה (Peek Sheet).',
+          badge: 'מרחבי וגמיש',
+          iconName: 'Compass',
+          prompt: 'הגדר את פריסת האזור ל-floating-islands עם כרטיסים צפים ומודאל הרחבה עשיר.',
+        }
+      );
+    } else {
+      layoutSuggestions.push(
+        {
+          id: 'generic-layout-modern',
+          tab: 'layout',
+          title: 'מתיחת פנים מודרנית ועיצוב זכוכית (Glassmorphism)',
+          description: 'שדרוג מראה האזור לקו עיצוב נקי עם שקיפויות עדינות, פינות מעוגלות וקונטרסט מושלם.',
+          badge: 'עיצוב נקי',
+          iconName: 'Sparkles',
+          prompt: 'שדרג את העיצוב החזותי של אזור זה לרמה הגבוהה ביותר: טיפוגרפיה מלוטשת, מרווחים נכונים וקונטרסט יוקרתי.',
+        }
+      );
+    }
+
+    return {
+      brandSuggestions,
+      pageContextSuggestions,
+      layoutSuggestions,
+    };
+  },
+
+  /**
+   * Executes the enhancement via Gemini API or instant rule-based fallback.
+   * GUARANTEED to never fail silently or return a broken object.
+   */
+  async enhanceSection(params: {
+    sectionType: SectionType;
+    instructionPrompt: string;
+    currentConfig: any;
+    brandDna?: BrandDna | null;
+    allSections?: Record<string, any>;
+    sectionOrder?: string[];
+    pageTitle?: string;
+    providedApiKey?: string;
+  }): Promise<SectionEnhancementResult> {
+    const {
+      sectionType,
+      instructionPrompt,
+      currentConfig,
+      brandDna,
+      allSections,
+      sectionOrder,
+      pageTitle,
+      providedApiKey,
+    } = params;
+
+    const dna = resolveLiveBrandDna(brandDna);
+    const company = dna?.identity?.companyName || 'העסק';
+    const slogan = dna?.identity?.slogan || '';
+    const uvp = dna?.audience?.mainUvp || '';
+    const tone = (dna?.voice as any)?.tone || dna?.voice?.powerWords?.join(', ') || 'מקצועי, סמכותי ויוקרתי';
+    const targetAudience = dna?.audience?.targetAudiences?.join(', ') || 'לקוחות איכותיים';
+    const phone = dna?.trust?.contactPhone || '';
+    const whatsapp = dna?.trust?.whatsappSupportNumber || '';
+
+    // Summary of existing page sections
+    const pageStructure = (sectionOrder || [])
+      .map((secId, idx) => {
+        const s = allSections?.[secId];
+        return `${idx + 1}. [${s?.type || 'section'}]: "${s?.title || s?.adminTitle || ''}"`;
+      })
+      .join(' | ');
+
+    const apiKey = resolveApiKey(providedApiKey);
+
+    // Prompt engineered for Gemini
+    const systemInstruction = `You are KOSUN AI - a World-Class Lead UI/UX Designer and Hebrew Conversion Copywriter.
+Your task is to refine and elevate a web page section for "${company}".
+You must return ONLY a single valid JSON object containing the updated section configuration properties.
+DO NOT wrap in markdown ticks if possible, and DO NOT add conversational text before or after the JSON.
+All copy must be natural, high-converting, idiomatic Hebrew without robotic translations.`;
+
+    const promptText = `
+Brand Identity & DNA:
+- Company Name: "${company}"
+- Slogan: "${slogan}"
+- Unique Value Proposition (UVP): "${uvp}"
+- Target Audience: "${targetAudience}"
+- Tone & Voice: "${tone}"
+- Phone: "${phone}"
+- WhatsApp: "${whatsapp}"
+
+Page Context:
+- Page Title: "${pageTitle || 'עמוד נחיתה'}"
+- Overall Sections on Page: ${pageStructure || 'עמוד מעוצב'}
+
+Section to Refine:
+- Section Type: "${sectionType}"
+- User Request / Improvement Goal: "${instructionPrompt}"
+- Current Section Configuration:
+${JSON.stringify(currentConfig, null, 2)}
+
+INSTRUCTIONS:
+1. Retain the core structure of the section (${sectionType}).
+2. Rewrite or elevate Hebrew titles, subtitles, descriptions, and buttons to be exceptionally compelling and aligned with the brand DNA and page context.
+3. Keep or enhance relevant fields (e.g. layout, style, items, icons, badges).
+4. Preserve "id" and "type".
+Return ONLY the raw updated JSON object.`;
+
+    if (apiKey) {
+      try {
+        const rawData = await dispatchSectionEnhancementToKosai(
+          {
+            sectionType,
+            userPrompt: promptText,
+            companyName: brandDna?.identity?.companyName || 'העסק',
+            currentConfig,
+          },
+          { apiKey }
+        );
+
+        if (rawData) {
+          // Flatten if wrapped in data or section
+          const unwrapped = rawData.data || rawData.section || rawData;
+
+          const merged = {
+            ...currentConfig,
+            ...unwrapped,
+            id: currentConfig?.id || `${sectionType}_${Date.now()}`,
+            type: sectionType,
+            anchorId: currentConfig?.anchorId || unwrapped.anchorId,
+          };
+
+          const summary: string[] = [];
+          if (merged.title && merged.title !== currentConfig?.title) {
+            summary.push(`כותרת שודרגה: "${merged.title}"`);
+          }
+          if (merged.subtitle && merged.subtitle !== currentConfig?.subtitle) {
+            summary.push(`תת-כותרת הותאמה ל-DNA המותג`);
+          }
+          if (merged.layout && merged.layout !== currentConfig?.layout) {
+            summary.push(`סגנון פריסה עודכן ל-${merged.layout}`);
+          }
+          if (merged.activeMode && merged.activeMode !== currentConfig?.activeMode) {
+            summary.push(`תצורת תצוגה עתידנית עודכנה ל-${merged.activeMode}`);
+          }
+          if (summary.length === 0) {
+            summary.push(`שדרוג מקיף בתוכן ובמסרים של האזור`);
+          }
+
+          return {
+            success: true,
+            updatedConfig: merged,
+            summaryOfChanges: summary,
+            isFromAi: true,
+            message: 'השדרוג הופק בהצלחה על ידי KOSUN AI (מודל gemini-3.8-flash-lite)',
+          };
+        }
+      } catch (err: any) {
+        console.warn('[sectionEnhancerService] kosai call warning, engaging zero-token brand heuristic fallback:', err);
+      }
+    }
+
+    // Zero-token offline / fallback heuristic derived from Brand DNA
+    const fallback = this.applySmartBrandHeuristic(
+      sectionType,
+      currentConfig,
+      instructionPrompt,
+      brandDna || null
+    );
+
+    return {
+      success: true,
+      updatedConfig: fallback.config,
+      summaryOfChanges: fallback.changes.length > 0 ? fallback.changes : ['האזור שודרג בהצלחה בהתאם ל-DNA של המותג'],
+      isFromAi: false,
+      message: 'האזור שודרג בהצלחה באמצעות אלגוריתם ה-DNA של המותג',
+    };
+  },
+
+  /**
+   * High-quality deterministic brand-DNA heuristic transformation
+   */
+  applySmartBrandHeuristic(
+    sectionType: SectionType,
+    currentConfig: any,
+    prompt: string,
+    dna: BrandDna | null
+  ): { config: any; changes: string[] } {
+    const company = dna?.identity?.companyName || 'העסק המוביל';
+    const slogan = dna?.identity?.slogan || 'פתרונות מובילים בהתאמה אישית';
+    const uvp = dna?.audience?.mainUvp || 'שירות בלתי מתפשר ומקצועיות ברמה הגבוהה ביותר';
+    const phone = dna?.trust?.contactPhone || '052-6968008';
+    const whatsapp = dna?.trust?.whatsappSupportNumber || '0526968008';
+
+    const updated = { ...currentConfig };
+    const changes: string[] = [];
+
+    if (sectionType === 'hero') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        changes.push('שודרג לפריסה בסגנון נשי (רכה ואלגנטית)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        changes.push('שודרג לפריסה בסגנון גברי (עוצמתית ודומיננטית)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        changes.push('שודרג לפריסה רוחנית (הרמונית ושלווה)');
+      } else if (prompt.includes('sharp') || prompt.includes('חד')) {
+        updated.layout = 'sharp';
+        changes.push('שודרג לפריסה חדה (ברוטליסטית ומדויקת)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        changes.push('שודרג לפריסה אנליטית (מבוססת נתונים ודיוק)');
+      } else if (prompt.includes('bento') || prompt.includes('Bento')) {
+        updated.layout = 'bento-hero';
+        updated.heroStyle = 'mesh-glow';
+        changes.push('שודרג לפריסת Bento Hero עכשווית עם Mesh Glow');
+      } else if (prompt.includes('split') || prompt.includes('ספליט')) {
+        updated.layout = 'spatial';
+        changes.push('שודרג לפריסת Spatial Split מרחבית');
+      } else if (prompt.includes('centered') || prompt.includes('נקי') || prompt.includes('מינימלי')) {
+        updated.layout = 'centered';
+        changes.push('שודרג לפריסת Centered נקייה וממורכזת');
+      }
+
+      updated.title = `${company} – ${slogan || 'המקום שבו מקצועיות פוגשת תוצאות'}`;
+      updated.subtitle = uvp;
+      updated.description = `מערכת פרימיום מתקדמת המעניקה מענה מדויק, מהיר ומותאם אישית לכל צורך עסקי.`;
+      
+      updated.announcementBadge = {
+        text: `השקה בלעדית: פתרונות חדשים לשנת 2026`,
+        url: '#services',
+        icon: 'Sparkles',
+      };
+
+      updated.primaryButton = {
+        text: 'בואו נתחיל עכשיו',
+        url: '#contact',
+      };
+      updated.secondaryButton = {
+        text: 'לשיחה ישירה בוואטסאפ',
+        url: `https://wa.me/${whatsapp.replace(/[^0-9]/g, '')}`,
+      };
+
+      changes.push(`כותרת ותת-כותרת סונכרנו ישירות עם שם המותג וה-UVP`);
+      changes.push(`חיבור כפתורי הנעה לפעולה ישירות לוואטסאפ ולטופס העמוד`);
+    } else if (sectionType === 'richContent') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        changes.push('שודרג לפריסת תוכן בסגנון נשי (רכה ואלגנטית)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        changes.push('שודרג לפריסת תוכן בסגנון גברי (עוצמתית ודומיננטית)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        changes.push('שודרג לפריסת תוכן רוחנית (הרמונית ושלווה)');
+      } else if (prompt.includes('sharp') || prompt.includes('חדה')) {
+        updated.layout = 'sharp';
+        changes.push('שודרג לפריסת תוכן חדה (ברוטליסטית ומדויקת)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        changes.push('שודרג לפריסת תוכן אנליטית (מבוססת נתונים ודיוק)');
+      } else if (prompt.includes('standard') || prompt.includes('bento') || prompt.includes('עכשווי')) {
+        updated.layout = 'standard';
+        changes.push('שודרג לפריסת תוכן עכשווית (Standard)');
+      }
+
+      updated.heading = `אודות ${company} – ${slogan || 'החזון והמומחיות שלנו'}`;
+      updated.subtitle = `• ${company} •`;
+      updated.body = `<p>${uvp || `ב-${company} אנו משלבים חדשנות, מומחיות וליווי אישי ליצירת תוצאות מדידות ויוצאות דופן עבור כל לקוח.`}</p>`;
+      updated.primaryButton = {
+        text: 'לתיאום שיחת היכרות',
+        url: '#contact',
+      };
+      changes.push(`סונכרנו כותרות ותוכן האזור עם מיתוג ${company}`);
+    } else if (sectionType === 'faq') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        changes.push('שודרג לפריסת שאלות ותשובות נשית (אלגנטית ורכה)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        changes.push('שודרג לפריסת שאלות ותשובות גברית (חזקה ודומיננטית)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        changes.push('שודרג לפריסת שאלות ותשובות רוחנית (הרמונית ומרגיעה)');
+      } else if (prompt.includes('sharp') || prompt.includes('חד')) {
+        updated.layout = 'sharp';
+        changes.push('שודרג לפריסת שאלות ותשובות חדה (הייטק ומינימליזם)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        changes.push('שודרג לפריסת שאלות ותשובות אנליטית (מבוססת סדר ודיוק)');
+      } else if (prompt.includes('standard') || prompt.includes('current') || prompt.includes('עכשווי')) {
+        updated.layout = 'standard';
+        changes.push('שודרג לפריסת שאלות ותשובות עכשווית');
+      }
+
+      updated.title = `שאלות ותשובות נפוצות על ${company}`;
+      updated.subtitle = `כל מה שחשוב לדעת על הפתרונות והשירותים המובילים של ${company}`;
+      if (whatsapp || phone) {
+        updated.showContactCTA = true;
+        updated.contactPhone = whatsapp || phone;
+      }
+      changes.push(`סונכרנו כותרות השאלות והתשובות ופרטי הוואטסאפ של ${company}`);
+    } else if (sectionType === 'pricing') {
+      updated.title = `מסלולי הצטרפות מותאמים עבורכם`;
+      updated.subtitle = `שקיפות מלאה ללא אותיות קטנות – בחרו את החבילה המתאימה`;
+      if (Array.isArray(updated.packages) && updated.packages.length > 1) {
+        updated.packages = updated.packages.map((pkg: any, idx: number) => ({
+          ...pkg,
+          isFeatured: idx === 1,
+          badge: idx === 1 ? 'הכי פופולרי' : pkg.badge,
+        }));
+        changes.push('החבילה המרכזית סומנה כחבילת VIP מומלצת');
+      }
+    } else if (sectionType === 'contact') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        changes.push('שודרג לפריסת צור קשר נשית (אלגנטית ורכה)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        changes.push('שודרג לפריסת צור קשר גברית (חזקה ודומיננטית)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        changes.push('שודרג לפריסת צור קשר רוחנית (הרמונית ומרגיעה)');
+      } else if (prompt.includes('sharp') || prompt.includes('חד')) {
+        updated.layout = 'sharp';
+        changes.push('שודרג לפריסת צור קשר חדה (ברוטליסטית וחדה)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        changes.push('שודרג לפריסת צור קשר אנליטית (מבוססת טלמטריה ונתונים)');
+      } else if (prompt.includes('standard') || prompt.includes('current') || prompt.includes('עכשווי')) {
+        updated.layout = 'standard';
+        changes.push('שודרג לפריסת צור קשר עכשווית');
+      }
+
+      updated.title = `בואו נדבר – הצוות של ${company} כאן לרשותכם`;
+      updated.subtitle = `מענה אנושי מהיר וליווי צמוד לכל שאלה`;
+      updated.phone = phone || updated.phone;
+      updated.whatsapp = whatsapp || updated.whatsapp;
+      updated.directWhatsappChat = true;
+      changes.push(`סונכרנו פרטי ההתקשרות והוואטסאפ של ${company}`);
+    } else if (sectionType === 'imageListing') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        changes.push('שודרג לפריסת גלריה נשית (רכה ורוז-גולד עם קשתות)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        changes.push('שודרג לפריסת גלריה גברית (פחם, זהב פליז ומסגרת פלדה)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        changes.push('שודרג לפריסת גלריה רוחנית (מרווה, מנטה ושלווה)');
+      } else if (prompt.includes('sharp') || prompt.includes('חד')) {
+        updated.layout = 'sharp';
+        changes.push('שודרג לפריסת גלריה חדה (הייטק, ציאן ניאון ו-90 מעלות)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        changes.push('שודרג לפריסת גלריה אנליטית (אינדקס נתונים #01 וסדר קטלוגי)');
+      } else if (prompt.includes('standard') || prompt.includes('current') || prompt.includes('עכשווי')) {
+        updated.layout = 'standard';
+        changes.push('שודרג לפריסת גלריה עכשווית');
+      }
+
+      if (prompt.includes('זזה') || prompt.includes('קרוסלה') || prompt.includes('carousel')) {
+        updated.displayMode = 'carousel';
+        updated.carouselAutoplay = true;
+        changes.push('הופעלה תצוגה זזה (Carousel אוטומטי עם חיצים וגלילה)');
+      }
+
+      if (prompt.includes('מתחלף') || prompt.includes('רקע')) {
+        updated.backgroundMode = 'image-sync';
+        changes.push('הופעל רקע דינמי מתחלף התואם לתמונה האקטיבית');
+      }
+
+      updated.title = `גלריית ${company}`;
+      updated.subtitle = slogan || 'הצצה לעולם העשיר, ליצירה ולפרויקטים המובילים שלנו';
+      updated.badge = `• ${company} SHOWCASE •`;
+      changes.push(`סונכרנו כותרות הגלריה והמיתוג של ${company}`);
+    } else if (sectionType === 'videoGallery') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        changes.push('שודרג לפריסת גלריית וידאו נשית (רכה ורוז-גולד עם קשתות)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        changes.push('שודרג לפריסת גלריית וידאו גברית (פחם, זהב פליז ומסגרת פלדה)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        changes.push('שודרג לפריסת גלריית וידאו רוחנית (מרווה, מנטה ושלווה)');
+      } else if (prompt.includes('sharp') || prompt.includes('חד')) {
+        updated.layout = 'sharp';
+        changes.push('שודרג לפריסת גלריית וידאו חדה (הייטק, ציאן ניאון ו-90 מעלות)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        changes.push('שודרג לפריסת גלריית וידאו אנליטית (אינדקס נתונים #01 וסדר קטלוגי)');
+      } else if (prompt.includes('standard') || prompt.includes('current') || prompt.includes('עכשווי')) {
+        updated.layout = 'standard';
+        changes.push('שודרג לפריסת גלריית וידאו עכשווית');
+      }
+
+      updated.title = `ספריית הוידאו והתוכן של ${company}`;
+      updated.subtitle = slogan || 'סרטונים, הדרכות ותוכן בלעדי';
+      updated.source = 'tenant_youtube';
+      changes.push(`סונכרנו כותרות גלריית הוידאו וחיבור ברירת מחדל לנתוני YouTube של ${company}`);
+    } else if (sectionType === 'videoEngagement') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        changes.push('שודרג לפריסת אינטראקציה נשית (רכה ורוז-גולד עם קשתות)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        changes.push('שודרג לפריסת אינטראקציה גברית (פחם, זהב פליז ומסגרת פלדה)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        changes.push('שודרג לפריסת אינטראקציה רוחנית (מרווה, מנטה ושלווה)');
+      } else if (prompt.includes('sharp') || prompt.includes('חד')) {
+        updated.layout = 'sharp';
+        changes.push('שודרג לפריסת אינטראקציה חדה (הייטק, ציאן ניאון ו-90 מעלות)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        changes.push('שודרג לפריסת אינטראקציה אנליטית (אינדקס נתונים #01 וסדר קטלוגי)');
+      } else if (prompt.includes('standard') || prompt.includes('current') || prompt.includes('עכשווי')) {
+        updated.layout = 'standard';
+        changes.push('שודרג לפריסת אינטראקציה עכשווית');
+      }
+
+      updated.title = `אינטראקציה, שיתוף ותגובות • ${company}`;
+      updated.videoTitle = `הסרטון של ${company}`;
+      updated.socialButtonsStyle = 'icons-only';
+      updated.showButtonLabels = false;
+      changes.push(`סונכרנו פרטי האינטראקציה, שיתוף רשתות ומיתוג ${company} (ברירת מחדל: אייקונים וטולטיפ)`);
+    } else if (sectionType === 'timer') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        updated.boxShape = 'flower';
+        changes.push('שודרג לפריסת טיימר בסגנון נשי (רכה ואלגנטית עם תיבות פרח/לב)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        updated.boxShape = 'shield';
+        changes.push('שודרג לפריסת טיימר בסגנון גברי (עוצמתית וטקטית עם תיבות מגן פלדה)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        updated.boxShape = 'lotus';
+        changes.push('שודרג לפריסת טיימר רוחנית (הרמונית ושלווה עם תיבות לוטוס)');
+      } else if (prompt.includes('sharp') || prompt.includes('חד')) {
+        updated.layout = 'sharp';
+        updated.boxShape = 'sharp';
+        changes.push('שודרג לפריסת טיימר חדה (ברוטליסטית מדויקת 90 מעלות עם מסגרת 2px)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        updated.boxShape = 'hud';
+        changes.push('שודרג לפריסת טיימר אנליטית (מסוף HUD טכנולוגי חתוך זוויות)');
+      } else if (prompt.includes('standard') || prompt.includes('current') || prompt.includes('עכשווי')) {
+        updated.layout = 'standard';
+        updated.boxShape = 'rounded';
+        changes.push('שודרג לפריסת טיימר עכשווית');
+      }
+
+      updated.title = `הספירה לאחור של ${company} החלה`;
+      updated.subtitle = slogan || 'אל תפספסו את ההזדמנות להצטרף בתנאי השקה בלעדיים';
+      updated.ctaText = 'הבטיחו את מקומכם עכשיו';
+      if (whatsapp || phone) {
+        updated.ctaUrl = `https://wa.me/${(whatsapp || phone).replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`שלום, אני פונה לגבי ההשקה של ${company}`)}`;
+      }
+      changes.push(`סונכרנו כותרות הטיימר, תאריך היעד וחיבור הנעה לפעולה של ${company}`);
+    } else if (sectionType === 'livePosts') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        changes.push('שודרג לפריסת עדכונים ואירועים בסגנון נשי (רכה, אלגנטית, קשתות רוז-גולד)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        changes.push('שודרג לפריסת עדכונים ואירועים בסגנון גברי (עוצמתית, מסגרת פלדה כפולה וזהב ענבר)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        changes.push('שודרג לפריסת עדכונים ואירועים רוחנית (מרווה, טורקיז, הילה ושלווה)');
+      } else if (prompt.includes('sharp') || prompt.includes('חד')) {
+        updated.layout = 'sharp';
+        changes.push('שודרג לפריסת עדכונים ואירועים חדה (ברוטליסטית, 90 מעלות וצל מוסט קשיח)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        changes.push('שודרג לפריסת עדכונים ואירועים אנליטית (מסוף HUD טכנולוגי, זמני קריאה ומדדים)');
+      } else if (prompt.includes('standard') || prompt.includes('current') || prompt.includes('עכשווי')) {
+        updated.layout = 'standard';
+        changes.push('שודרג לפריסת עדכונים ואירועים עכשווית');
+      }
+
+      if (prompt.includes('קרוסלה') || prompt.includes('carousel')) {
+        updated.displayMode = 'carousel';
+        changes.push('הופעלה תצוגת קרוסלה זזה עם חיצים');
+      } else if (prompt.includes('ספוטלייט') || prompt.includes('מוביל') || prompt.includes('spotlight')) {
+        updated.displayMode = 'spotlight';
+        changes.push('הופעלה תצוגת פוסט ראשי מודגש (Spotlight)');
+      }
+
+      updated.title = `עדכונים ואירועים אחרונים של ${company}`;
+      updated.subtitle = slogan || 'כל מה שחדש וקורה בפעילות, בקהילה ובהשקות שלנו';
+      updated.showCtaButton = true;
+      updated.ctaText = 'לכל האירועים והחדשות';
+      if (whatsapp || phone) {
+        updated.ctaUrl = `https://wa.me/${(whatsapp || phone).replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`שלום, קראתי על העדכונים של ${company}`)}`;
+      }
+      changes.push(`סונכרנו כותרות, פרטי האירועים ו-DNA המותג של ${company}`);
+    } else if (sectionType === 'kosvidio') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        changes.push('שודרג לנגן Kosvidio בסגנון נשי (קשתות מעוגלות, רוז-גולד והילה עדינה)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        changes.push('שודרג לנגן Kosvidio בסגנון גברי (מסגרת פלדה כפולה וזהב ענבר סמכותי)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        changes.push('שודרג לנגן Kosvidio רוחני (מרווה, טורקיז והילת לוטוס שלווה)');
+      } else if (prompt.includes('sharp') || prompt.includes('חד')) {
+        updated.layout = 'sharp';
+        changes.push('שודרג לנגן Kosvidio חד (ברוטליסטי, 90 מעלות וצל מוסט קשיח)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        changes.push('שודרג לנגן Kosvidio אנליטי (מסוף HUD טכנולוגי חתוך זוויות וקווי סריקה)');
+      } else if (prompt.includes('standard') || prompt.includes('current') || prompt.includes('עכשווי')) {
+        updated.layout = 'standard';
+        changes.push('שודרג לנגן Kosvidio עכשווי (Notion SaaS 2026)');
+      }
+
+      updated.title = `${company} – צפו בסיפור שלנו`;
+      updated.channelName = company;
+      updated.channelSubscribers = '25K+ מנויים';
+      changes.push(`סונכרנו פרטי הנגן והערוץ של ${company}`);
+    } else if (sectionType === 'mainContent') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        changes.push('שודרג לפריסת באנר נשית (רכה ורוז-גולד עם קשתות)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        changes.push('שודרג לפריסת באנר גברית (פחם, זהב פליז ומסגרת פלדה)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        changes.push('שודרג לפריסת באנר רוחנית (מרווה, מנטה ושלווה)');
+      } else if (prompt.includes('sharp') || prompt.includes('חד')) {
+        updated.layout = 'sharp';
+        changes.push('שודרג לפריסת באנר חדה (הייטק, ציאן ניאון ו-90 מעלות)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        changes.push('שודרג לפריסת באנר אנליטית (אינדקס נתונים #01 וסדר קטלוגי)');
+      } else if (prompt.includes('standard') || prompt.includes('current') || prompt.includes('עכשווי')) {
+        updated.layout = 'standard';
+        changes.push('שודרג לפריסת באנר עכשווית');
+      }
+
+      updated.title = `הצטרפו לתכנית ההכשרה והמומחיות של ${company}`;
+      updated.subtitle = slogan || 'הרשמה מוקדמת בתנאים מועדפים';
+      updated.badge = `• ${company} ACADEMY •`;
+      if (whatsapp || phone) {
+        updated.primaryButton = {
+          text: 'שריינו מקום עכשיו',
+          url: `https://wa.me/${(whatsapp || phone).replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`שלום, אני מעוניין להירשם לתכנית של ${company}`)}`,
+        };
+      }
+      changes.push(`סונכרנו פרטי הבאנר, יתרונות ההכשרה והוואטסאפ של ${company}`);
+    } else if (sectionType === 'tiktokHero') {
+      updated.headline = prompt.includes('הוק') || prompt.includes('קצר') ? `${slogan || 'ההזדמנות שלך מתחילה כאן'}` : `${company} – כל אדם זה נכס`;
+      updated.card = {
+        enabled: true,
+        tag: `• ${company} – פתרונות מובילים לשנת 2026 •`,
+        title: `${company} – ${slogan || 'כל אדם זה נכס'}`,
+        subtitle: uvp || 'מערכת פרימיום מתקדמת המעניקה מענה מדויק, מהיר ומותאם אישית לכל צורך עסקי.',
+        style: 'solid',
+      };
+      updated.ctaButton = {
+        ...(updated.ctaButton || {}),
+        text: 'התחל עכשיו בחינם',
+        iconName: 'Sparkles',
+        showIcon: true,
+        actionType: 'modal_form',
+      };
+      updated.modalTitle = `השארת פרטים לקבלת הצעה מ-${company}`;
+      updated.modalSubtitle = `נשמח לחזור אליך בהקדם עם כל המידע והפתרונות המותאמים אישית.`;
+      changes.push(`סונכרנו כותרת ההוק, כרטיס המותג הצף ופרטי מודאל הטופס עם ${company}`);
+      changes.push(`הוטמעו מספרי יצירת הקשר והוואטסאפ של המותג`);
+    } else if (sectionType === 'eventRsvp') {
+      updated.eventTitle = `אירוע חגיגי מבית ${company}`;
+      updated.subtitle = `הזמנה אישית ומיוחדת – שמחים להזמין אתכם לאירוע מוביל של ${company}`;
+      updated.locationName = dna?.trust?.officeAddress ? `מתחם ${company}` : updated.locationName;
+      updated.locationAddress = dna?.trust?.officeAddress || updated.locationAddress;
+      updated.wazeQuery = dna?.trust?.officeAddress || updated.wazeQuery;
+      updated.yesButtonText = 'מגיע/ה בשמחה';
+      updated.noButtonText = 'לא מתאפשר לי הפעם';
+      changes.push(`סנכרון פרטי האירוע, המיקום והניווט עם כתובת המותג של ${company}`);
+    } else if (sectionType === 'dynamicListing') {
+      updated.title = `הפעילות והשירותים המובילים של ${company}`;
+      updated.subtitle = uvp || 'סקירה מעמיקה של כל העדכונים, הפרויקטים והשירותים המובילים';
+      if (prompt.includes('bento') || prompt.includes('Bento')) {
+        updated.layout = 'bento-showcase';
+        changes.push('שודרג לפריסת Bento Showcase עם כרטיס Spotlight');
+      } else if (prompt.includes('carousel') || prompt.includes('סליידר') || prompt.includes('קרוסלה')) {
+        updated.layout = 'snap-carousel';
+        changes.push('שודרג לפריסת Snap Carousel אופקית וחלקה');
+      } else if (prompt.includes('editorial') || prompt.includes('מגזין')) {
+        updated.layout = 'editorial-list';
+        changes.push('שודרג לפריסת Editorial Magazine יוקרתית');
+      }
+      changes.push(`סונכרנו כותרות הליסטינג עם המותג ${company}`);
+    } else if (sectionType === 'futureContent2027') {
+      updated.title = `העתיד של ${company}: תוכן וחדשנות`;
+      updated.subtitle = uvp || slogan || 'שילוב רב-ממדי של עומק מרחבי, טיפוגרפיה קינטית וזכוכית פריזמטית';
+      if (prompt.includes('bento') || prompt.includes('בנטו')) {
+        updated.activeMode = 'prism-bento';
+        changes.push('מעבר לפריסת בנטו מרחבי (Prism Bento) עם תאורה סביבתית');
+      } else if (prompt.includes('kinetic') || prompt.includes('קינטי') || prompt.includes('מגזין')) {
+        updated.activeMode = 'kinetic-editorial';
+        changes.push('מעבר לפריסת מגזין קינטי (Kinetic Editorial) עם סאונד AI');
+      } else if (prompt.includes('islands') || prompt.includes('איים')) {
+        updated.activeMode = 'floating-islands';
+        changes.push('מעבר לפריסת איים צפים (Floating Islands) עם מודאל חשיפה');
+      } else {
+        changes.push(`סנכרון תכני המותג, צבעי ה-DNA ותקצירי ה-AI של ${company}`);
+      }
+
+      // Populate items from services if sparse or requested
+      const services = dna?.ecosystem?.services || [];
+      if (services.length > 0) {
+        updated.items = services.slice(0, 5).map((srv: any, idx: number) => ({
+          id: `future-srv-${idx + 1}`,
+          title: srv.name || `פעילות ${idx + 1}`,
+          subtitle: srv.description || slogan,
+          description: srv.description || `${company} מעניקה מענה מקצועי ואיכותי בסטנדרט בלתי מתפשר.`,
+          imageUrl: srv.imageUrl || 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
+          category: srv.category || 'שירותים',
+          tag: '• שירות מוביל •',
+          readTime: '3 דק׳ קריאה',
+          audioDuration: '01:30',
+          ctaText: 'לפרטים והזמנה',
+          ctaUrl: `https://wa.me/${(whatsapp || '0526968008').replace(/\D/g, '')}?text=${encodeURIComponent(`שלום, אשמח לקבל פרטים על ${srv.name}`)}`,
+          metrics: srv.price ? [{ label: 'מחיר', value: `₪${srv.price}` }] : undefined,
+        }));
+        changes.push('רענון פריטי התוכן והשירותים מתוך טאב השירותים במיתוג');
+      }
+    } else if (sectionType === 'kosvidioGallery') {
+      if (prompt.includes('feminine') || prompt.includes('נשי')) {
+        updated.layout = 'feminine';
+        changes.push('שודרג לפריסת גלריית וידאו נשית (רכה ורוז-גולד עם קשתות)');
+      } else if (prompt.includes('masculine') || prompt.includes('גברי')) {
+        updated.layout = 'masculine';
+        changes.push('שודרג לפריסת גלריית וידאו גברית (פחם, זהב פליז ומסגרת פלדה)');
+      } else if (prompt.includes('spiritual') || prompt.includes('רוחני')) {
+        updated.layout = 'spiritual';
+        changes.push('שודרג לפריסת גלריית וידאו רוחנית (מרווה, מנטה ושלווה)');
+      } else if (prompt.includes('sharp') || prompt.includes('חד')) {
+        updated.layout = 'sharp';
+        changes.push('שודרג לפריסת גלריית וידאו חדה (הייטק, ציאן ניאון ו-90 מעלות)');
+      } else if (prompt.includes('analytical') || prompt.includes('אנליטי')) {
+        updated.layout = 'analytical';
+        changes.push('שודרג לפריסת גלריית וידאו אנליטית (אינדקס נתונים #01 וסדר קטלוגי)');
+      } else if (prompt.includes('standard') || prompt.includes('current') || prompt.includes('עכשווי')) {
+        updated.layout = 'standard';
+        changes.push('שודרג לפריסת גלריית וידאו עכשווית');
+      }
+
+      if (prompt.includes('spotlight-grid') || prompt.includes('גדול')) {
+        updated.viewMode = 'spotlight-grid';
+        changes.push('מעבר לתצוגה א׳: וידאו מרכזי גדול ותחתיו כרטיסים');
+      } else if (prompt.includes('stacked-list') || prompt.includes('רשימה')) {
+        updated.viewMode = 'stacked-list';
+        changes.push('מעבר לתצוגת רשימה זה תחת זה');
+      } else if (prompt.includes('horizontal-scroll') || prompt.includes('אופקית')) {
+        updated.viewMode = 'horizontal-scroll';
+        changes.push('מעבר לתצוגת גלריה עם גלילה אופקית ללא גלישה');
+      }
+
+      updated.title = company ? `ספריית הוידאו והתוכן של ${company}` : 'ספריית הוידאו והתוכן';
+      updated.subtitle = slogan || 'סרטונים, הדרכות ותוכן בלעדי';
+      updated.badge = company ? `• ${company} VIDEO •` : '• ספריית וידאו חכמה •';
+      updated.description =
+        uvp || (company ? `צפו בסרטונים ובהדרכות המובילים של ${company}.` : 'סרטונים, הדרכות ותוכן בלעדי');
+      updated.channelName = company;
+      updated.channelSlogan = slogan;
+      updated.source = 'tenant_kosvidio';
+      updated.ctaButtonText = company ? `לכל הסרטונים של ${company}` : 'לכל הסרטונים וההדרכות';
+      updated.ctaButtonUrl = '/kosvidio';
+      updated.items = [];
+      changes.push(`סנכרון כותרות ספריית הוידאו מתוך מיתוג ${company}`);
+    } else {
+      updated.title = `${updated.title || 'שדרוג אזור'} – ${company}`;
+      updated.subtitle = uvp;
+      changes.push(`סנכרון כותרות ומסרים עם מיתוג ${company}`);
+    }
+
+    return {
+      config: updated,
+      changes,
+    };
+  },
+};
+
+export const aiSectionEnhancerService = sectionEnhancerService;

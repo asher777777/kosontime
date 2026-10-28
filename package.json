@@ -7,15 +7,18 @@
     "dev": "tsx server.ts",
     "build": "vite build && esbuild server.ts --platform=node --format=esm --target=node20 --outfile=dist/server.js",
     "start": "node dist/server.js",
+    "broadcast:copy": "tsx scripts/broadcast-copy-to-firebase.ts",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "broadcast:kosweb": "tsx scripts/broadcast-kosweb-to-firebase.ts"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@vitejs/plugin-react": "^6.1.1",
     "canvas-confetti": "^1.9.4",
+    "clsx": "^2.1.1",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
     "firebase": "^13.1.0",
@@ -24,6 +27,8 @@
     "qrcode.react": "^4.2.0",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
+    "react-router-dom": "^7.18.5",
+    "tailwind-merge": "^3.7.0",
     "vite": "^8.3.0"
   },
   "devDependencies": {

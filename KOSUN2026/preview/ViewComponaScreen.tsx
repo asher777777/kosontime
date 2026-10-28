@@ -23,12 +23,7 @@ import {
   ComonaConnectedActionMenu,
   ComonaAdapterConfig,
 } from '../adapters';
-import {
-  KosActionPortalView,
-  KosActionPortalEditor,
-  ActionPortalData,
-  ActionPortalStyleOverrides,
-} from '../components/action-portal';
+import { KosCognitivePortal } from '../components/action-portal/cognitive-portal/KosCognitivePortal';
 import { ArchetypeProvider } from '../theme/ArchetypeEngine';
 
 interface ComponentDoc {
@@ -43,25 +38,22 @@ interface ComponentDoc {
 
 const CATALOG: ComponentDoc[] = [
   {
-    id: 'KosActionPortal',
-    name: 'KosActionPortal (פורטל מוצרים ופעולות אינטראקטיבי)',
+    id: 'KosCognitivePortal',
+    name: 'KosCognitivePortal (פורטל קוגניטיבי רב-טננטי 2026)',
     category: 'Lists & Cards',
     status: 'Ready',
-    description: 'פורטל כרטיסיות פעולה ממותג (בדיוק לפי התמונה). כולל רקע אטמוספרי (Cosmos), פריסה דינמית (Pills / Grid), תגי אייקונים עם מספרים (01, 02), שורת סוכן וקלט קולי, ופאנל עריכה (Editor) מובנה לכל אלמנט.',
-    schemaExample: `<KosActionPortalView
-  data={portalData}
-  styleOverrides={styleOverrides}
-  onAction={(actionType, payload) => console.log('Action triggered:', actionType)}
-  onVoiceInputSubmit={(text) => console.log('Voice query:', text)}
+    description: 'מערכת KOSUN מלאה המחוברת בזמן אמת ל-Firestore. כוללת את עמוד הבית, עמוד חקר שאילתות The Big 3, בורר יום/לילה, קפסולת AI עליונה, ומרכז ניהול בעל עסק.',
+    schemaExample: `<KosCognitivePortal
+  tenantId="kosun"
+  targetProject="comona"
+  defaultAudience="guest"
 />`,
     propsDoc: [
-      { name: 'data', type: 'ActionPortalData', description: 'כותרת, תמונת סמל עליון, אווטאר סוכן, ורשימת פריטים (01, 02)' },
-      { name: 'styleOverrides', type: 'ActionPortalStyleOverrides', description: 'דריסת עיצוב, רקע (Cosmos/Aurora), פריסה ומעברים' },
-      { name: 'onAction', type: '(actionType, payload) => void', description: 'חוזה הפעלת פעולות דינמי' },
-      { name: 'onVoiceInputSubmit', type: '(query) => void', description: 'קלט קולי או טקסטואלי מסוכן הקליטה' },
+      { name: 'tenantId', type: 'string', description: 'מזהה הטננט (kosun / turbo_motors)' },
+      { name: 'targetProject', type: '"comona" | "kosun"', description: 'פרויקט ה-DB' },
+      { name: 'defaultAudience', type: '"guest" | "owner"', description: 'מצב אורח / בעל עסק' },
     ],
   },
-
   {
     id: 'KosActionMenuSheet',
     name: 'KosActionMenuSheet (תפריט פעולות ואקורדיון לשוניות)',
@@ -157,42 +149,7 @@ const items: KosActionItem[] = [
 ];
 
 export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBackHome }) => {
-  const [selectedComponentId, setSelectedComponentId] = useState<string>('KosActionPortal');
-
-  // נתוני פורטל הפעולות (KosActionPortal) - בדיוק לפי התמונה!
-  const [portalData, setPortalData] = useState<ActionPortalData>({
-    title: 'אלו הם המוצרים שלנו',
-    items: [
-      {
-        id: 'p1',
-        indexBadge: '01',
-        title: 'לימוד והעשרה',
-        primaryIconName: 'GraduationCap',
-        secondaryIconName: 'GraduationCap',
-        actionType: 'OPEN_LEARNING'
-      },
-      {
-        id: 'p2',
-        indexBadge: '02',
-        title: 'צפיה בקושאנים שלך',
-        primaryIconName: 'Eye',
-        secondaryIconName: 'Eye',
-        actionType: 'VIEW_KOSUNS'
-      },
-      {
-        id: 'p3',
-        indexBadge: '03',
-        title: 'יצירה ועריכה',
-        primaryIconName: 'PenTool',
-        secondaryIconName: 'PenTool',
-        actionType: 'CREATE_EDIT'
-      }
-    ]
-  });
-  const [portalStyles, setPortalStyles] = useState<ActionPortalStyleOverrides>({
-    layout: 'vertical_pills'
-  });
-  const [isPortalEditorOpen, setIsPortalEditorOpen] = useState(false);
+  const [selectedComponentId, setSelectedComponentId] = useState<string>('KosCognitivePortal');
 
   const [isDemoMenuOpen, setIsDemoMenuOpen] = useState(false);
   const [isLiveComonaMenuOpen, setIsLiveComonaMenuOpen] = useState(false);
@@ -311,7 +268,7 @@ export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBack
   return (
     <div dir="rtl" className="min-h-screen bg-[#060810] text-[#F0F4FF] font-sans selection:bg-cyan-500/30 selection:text-cyan-300">
       {/* סרגל עליון */}
-      <header className="sticky top-0 z-30 bg-[#0A0D18]/90 backdrop-blur-md border-b border-[#1A233A] px-4 py-3 flex items-center justify-between">
+      <header className="sticky top-0 z-30 bg-[#111827]/90 backdrop-blur-md border-b border-slate-700 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -331,7 +288,7 @@ export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBack
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-xs text-white/40 font-mono hidden sm:inline">KOSUN2026 UI LAB</span>
+          <span className="text-xs text-slate-300 font-mono hidden sm:inline">KOSUN2026 UI LAB</span>
           <span className="px-2.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 text-xs font-bold">
             {CATALOG.filter((c) => c.status === 'Ready').length} מוכנים
           </span>
@@ -342,7 +299,7 @@ export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBack
       <div className="max-w-7xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* סרגל צד - קטלוג הקומפוננטות */}
         <aside className="lg:col-span-3 space-y-4">
-          <div className="p-4 rounded-2xl bg-[#0A0D18] border border-[#1A233A]">
+          <div className="p-4 rounded-2xl bg-[#111827] border border-slate-700">
             <h2 className="text-sm font-bold text-white/90 flex items-center gap-2 mb-3">
               <Layers className="w-4 h-4 text-cyan-400" />
               ספריית קומפוננטות
@@ -356,7 +313,7 @@ export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBack
                   className={`w-full text-right px-3 py-2.5 rounded-xl text-xs font-medium transition-all flex items-center justify-between cursor-pointer ${
                     selectedComponentId === item.id
                       ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-sm shadow-cyan-500/10'
-                      : 'text-white/60 hover:text-white hover:bg-white/5 border border-transparent'
+                      : 'text-slate-100 hover:text-white hover:bg-white/5 border border-transparent'
                   }`}
                 >
                   <span className="truncate">{item.name.split(' ')[0]}</span>
@@ -375,8 +332,8 @@ export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBack
           </div>
 
           {/* לוח תצוגת אירועים חיים */}
-          <div className="p-4 rounded-2xl bg-[#0A0D18] border border-[#1A233A] space-y-2">
-            <h3 className="text-xs font-bold text-white/70 flex items-center gap-2">
+          <div className="p-4 rounded-2xl bg-[#111827] border border-slate-700 space-y-2">
+            <h3 className="text-xs font-bold text-slate-100 flex items-center gap-2">
               <Sliders className="w-3.5 h-3.5 text-cyan-400" />
               אירועים חיים (Dispatcher Log)
             </h3>
@@ -388,7 +345,7 @@ export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBack
 
         {/* שטח עבודה מרכזי */}
         <main className="lg:col-span-9 space-y-6">
-          <div className="p-6 rounded-3xl bg-[#0A0D18] border border-[#1A233A] space-y-4">
+          <div className="p-6 rounded-3xl bg-[#111827] border border-slate-700 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-mono text-cyan-400 uppercase tracking-widest">
@@ -434,64 +391,35 @@ export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBack
               </div>
             </div>
 
-            <p className="text-sm text-white/70 leading-relaxed">{currentComp.description}</p>
+            <p className="text-sm text-slate-100 leading-relaxed">{currentComp.description}</p>
           </div>
 
-          {/* 🌟 אזור תצוגה חיה של KosActionPortal בדיוק כמו בתמונה! */}
-          {selectedComponentId === 'KosActionPortal' && (
-            <div className="p-6 rounded-3xl bg-[#0A0D18] border border-[#1A233A] space-y-4">
+          {/* 🌟 אזור תצוגה חיה של KosCognitivePortal מחובר ל-Firestore */}
+          {selectedComponentId === 'KosCognitivePortal' && (
+            <div className="p-4 sm:p-6 rounded-3xl bg-[#111827] border border-slate-700 space-y-4">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
                   <Eye className="w-4 h-4 text-cyan-400" />
-                  תצוגה חיה אינטראקטיבית (Live Interactive Preview)
+                  KosCognitivePortal (חיבור חי לקולקציות Firestore & COMONA)
                 </h2>
                 <span className="text-xs text-cyan-300 font-mono">
-                  הקש על כרטיס או נסה את הקלט הקולי
+                  ארכיטקטורת 9:16 מודולרית
                 </span>
               </div>
 
-              <div className="flex flex-col lg:flex-row gap-6 items-start justify-center pt-2">
-                {/* 📱 מוקאפ מובייל של הפורטל */}
-                <div className="w-full max-w-[380px] mx-auto rounded-[40px] overflow-hidden shadow-2xl border-4 border-slate-700/60 bg-black">
-                  <ArchetypeProvider initialArchetypeId="kosun_portal">
-                    <KosActionPortalView
-                      data={portalData}
-                      styleOverrides={portalStyles}
-                      onAction={(actionType, payload) => {
-                        setLastEventLog(`[PORTAL ACTION] ${actionType} - ${JSON.stringify(payload || {})}`);
-                      }}
-                      onVoiceInputSubmit={(query) => {
-                        setLastEventLog(`[VOICE AGENT] נקלט קול: "${query}"`);
-                      }}
-                    />
-                  </ArchetypeProvider>
-                </div>
-
-                {/* 🎛️ פאנל העורך הוויזואלי (Editor) אם פתוח */}
-                {isPortalEditorOpen && (
-                  <div className="w-full lg:flex-1 animate-fadeIn">
-                    <ArchetypeProvider initialArchetypeId="kosun_portal">
-                      <KosActionPortalEditor
-                        initialData={portalData}
-                        initialStyleOverrides={portalStyles}
-                        onSave={(newData, newStyles) => {
-                          setPortalData(newData);
-                          setPortalStyles(newStyles);
-                          setIsPortalEditorOpen(false);
-                          setLastEventLog('[EDITOR] שינויי תוכן ועיצוב נשמרו בהצלחה!');
-                        }}
-                        onClose={() => setIsPortalEditorOpen(false)}
-                      />
-                    </ArchetypeProvider>
-                  </div>
-                )}
+              <div className="w-full max-w-[430px] h-[820px] mx-auto rounded-[36px] overflow-hidden border-4 border-slate-700/80 shadow-2xl relative bg-black">
+                <KosCognitivePortal
+                  tenantId="kosun"
+                  targetProject="comona"
+                  defaultAudience="guest"
+                />
               </div>
             </div>
           )}
 
           {/* אם בחרנו במתאם COMONA - מציגים את ה-UI הקל להגדרה! */}
           {selectedComponentId === 'ComonaAdapter' ? (
-            <div className="p-6 rounded-3xl bg-[#0A0D18] border border-[#1A233A] space-y-4">
+            <div className="p-6 rounded-3xl bg-[#111827] border border-slate-700 space-y-4">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
                 <Database className="w-4 h-4 text-emerald-400" />
                 ממשק ויזואלי להגדרת חיבור COMONA & Firestore
@@ -505,7 +433,7 @@ export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBack
           ) : (
             /* מפרט Props וקוד רגיל */
             <>
-              <div className="p-6 rounded-3xl bg-[#0A0D18] border border-[#1A233A] space-y-4">
+              <div className="p-6 rounded-3xl bg-[#111827] border border-slate-700 space-y-4">
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
                   <Code2 className="w-4 h-4 text-cyan-400" />
                   מפרט Props ושקעים (Slots)
@@ -513,7 +441,7 @@ export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBack
                 <div className="overflow-x-auto">
                   <table className="w-full text-right text-xs">
                     <thead>
-                      <tr className="border-b border-white/10 text-white/40">
+                      <tr className="border-b border-white/10 text-slate-300">
                         <th className="pb-2.5 pr-2 font-mono">Prop / Slot</th>
                         <th className="pb-2.5 pr-2 font-mono">סוג (Type)</th>
                         <th className="pb-2.5 pr-2">תיאור והלבשה</th>
@@ -524,7 +452,7 @@ export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBack
                         <tr key={p.name} className="hover:bg-white/[0.02]">
                           <td className="py-2.5 pr-2 font-mono font-bold text-cyan-300">{p.name}</td>
                           <td className="py-2.5 pr-2 font-mono text-amber-300/80">{p.type}</td>
-                          <td className="py-2.5 pr-2 text-white/70">{p.description}</td>
+                          <td className="py-2.5 pr-2 text-slate-100">{p.description}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -532,7 +460,7 @@ export const ViewComponaScreen: React.FC<{ onBackHome: () => void }> = ({ onBack
                 </div>
               </div>
 
-              <div className="p-6 rounded-3xl bg-[#0A0D18] border border-[#1A233A] space-y-3">
+              <div className="p-6 rounded-3xl bg-[#111827] border border-slate-700 space-y-3">
                 <div className="flex items-center justify-between">
                   <h2 className="text-base font-bold text-white flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-cyan-400" />

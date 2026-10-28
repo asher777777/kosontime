@@ -1,0 +1,748 @@
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { PageBuilderConfig, SectionType, PageCategory, PAGE_CATEGORIES } from './types/pageBuilder.types';
+import { SECTION_REGISTRY } from './registry/sectionRegistry';
+import { PageBuilderEditor } from './PageBuilderEditor';
+import { PageBuilderRenderer } from './PageBuilderRenderer';
+import { PagesDashboardTab } from './components/PagesDashboardTab';
+import { PageCreationOptions } from './components/CreatePageWizardModal';
+import { AiLivePageBuilderModal } from './components/AiLivePageBuilderModal';
+import { UrlShortenerModal } from './components/UrlShortenerModal';
+import { pageBuilderFirestore } from './services/pageBuilderFirestore';
+import { useSystemConnection } from '../../core/connection/SystemConnectionContext';
+import { useTenantScope } from '../../core/tenant';
+import { useHostCapabilities } from '../../core/bridge/HostCapabilitiesContext';
+import { BrandDna, BrandDnaContract, TenantStylePreset } from '../../core/contracts';
+import { Layers, Edit3, Sparkles } from 'lucide-react';
+import { ContinuousMarketingIdeasDrawer } from './components/ContinuousMarketingIdeasDrawer';
+import { PageBuilderProvider } from './context/PageBuilderContext';
+import { hydrateSectionWithBrandDna, resolveLiveBrandDna } from './services/brandSectionHydrator';
+import { applyLayoutArchetypeToPage, STYLE_GLOBAL_THEMES } from './services/pageStylePresetService';
+import { ensureDefaultLegalPages, syncLegalPagesWithBrandDna } from './generators/legalPagesGenerator';
+import { ensureDefaultArchivePages, syncArchivePagesWithBrandDna } from './generators/archivePageGenerator';
+import { loadBrandDna } from '@/core';
+import { getPageBlueprints } from './blueprints/pageBlueprints';
+import { eventBus } from '../../core/bridge/EventBus';
+import { GoogleAnalyticsConsoleHub } from './components/GoogleAnalyticsConsoleHub';
+import { sanitizeSectionConfig } from './utils/sanitizeConfig';
+
+
+const STORAGE_KEY = 'kosun_pagebuilder_current_page';
+
+const getInitialCleanPageConfig = (brandDna?: any, tenantId?: string): PageBuilderConfig => {
+  const company = brandDna?.identity?.companyName || (tenantId && tenantId !== '_master' ? tenantId : 'קמונה פתרונות דיגיטליים');
+  return {
+    pageId: 'page_main_home',
+    pageTitle: `${company} - עמוד הבית הראשי`,
+    slug: 'home',
+    published: true,
+    isHomePage: true,
+    viewsCount: 0,
+    leadsCount: 0,
+    globalSettings: {
+      siteTitle: company,
+      companyName: company,
+      slogan: brandDna?.identity?.slogan || 'חדשנות, איכות וצמיחה מתמדת',
+      theme: 'modern',
+      headerLayout: 'capsule-floating',
+      headerSticky: true,
+      isHeaderVisible: true,
+      isFooterVisible: true,
+      primaryColor: brandDna?.designTokens?.primaryColor || '#6366f1',
+      secondaryColor: brandDna?.designTokens?.secondaryColor || '#0ea5e9',
+      backgroundColor: '#0a0a0c',
+      textColor: '#f8fafc',
+      buttonBgColor: brandDna?.designTokens?.primaryColor || '#6366f1',
+      fontFamily: brandDna?.designTokens?.fontFamily || 'Heebo, sans-serif',
+      contactWhatsApp: brandDna?.trust?.whatsappSupportNumber || '0526968008',
+      contactPhone: brandDna?.trust?.contactPhone || '052-6968008',
+      contactEmail: brandDna?.trust?.contactEmail || 'ovt5771@gmail.com',
+      address: brandDna?.trust?.officeAddress || 'דרך מנחם בגין 144, תל אביב',
+    },
+    seoSettings: {
+      title: `${company} - דפי נחיתה וניהול קהילות`,
+      description: brandDna?.identity?.shortVision || 'פלטפורמה מתקדמת לדפי אינטרנט ואוטומציות דיגיטליות.',
+      keywords: ['דפי נחיתה', 'קהילות', 'שירותים דיגיטליים', company],
+    geo: {
+      enabled: true,
+      targetCity: 'תל אביב',
+      targetRegion: 'גוש דן והמרכז',
+      targetCountry: 'ישראל',
+      serviceAreas: ['תל אביב וגוש דן', 'ירושלים והסביבה', 'השרון', 'צפון ודרום'],
+      localBusinessName: brandDna?.identity?.companyName || 'קמונה פתרונות דיגיטליים',
+      businessAddress: brandDna?.trust?.officeAddress || 'דרך מנחם בגין 144, תל אביב',
+      businessPhone: brandDna?.trust?.contactPhone || '052-6968008',
+      openingHours: 'א׳-ה׳: 09:00-19:00',
+    },
+  },
+  sectionOrder: [
+    'hero',
+    'logoMarquee',
+    'statsBento',
+    'testimonials',
+    'pricing',
+    'beforeAfter',
+    'faq',
+    'community',
+    'geoLocal',
+    'contact',
+  ],
+  sections: {
+    hero: { ...SECTION_REGISTRY.hero.defaultConfig, id: 'hero' },
+    logoMarquee: { ...SECTION_REGISTRY.logoMarquee.defaultConfig, id: 'logoMarquee' },
+    statsBento: { ...SECTION_REGISTRY.statsBento.defaultConfig, id: 'statsBento' },
+    testimonials: { ...SECTION_REGISTRY.testimonials.defaultConfig, id: 'testimonials' },
+    pricing: { ...SECTION_REGISTRY.pricing.defaultConfig, id: 'pricing' },
+    beforeAfter: { ...SECTION_REGISTRY.beforeAfter.defaultConfig, id: 'beforeAfter' },
+    faq: { ...SECTION_REGISTRY.faq.defaultConfig, id: 'faq' },
+    community: { ...SECTION_REGISTRY.community.defaultConfig, id: 'community' },
+    geoLocal: { ...SECTION_REGISTRY.geoLocal.defaultConfig, id: 'geoLocal' },
+    contact: { ...SECTION_REGISTRY.contact.defaultConfig, id: 'contact' },
+  },
+  };
+};
+
+const PageBuilderStandaloneViewInner: React.FC = () => {
+  const navigate = useNavigate();
+  const { db } = useSystemConnection();
+  const { tenantId, setTenantId } = useTenantScope();
+  const { getCapability } = useHostCapabilities();
+  const hostBrandDna = getCapability<BrandDnaContract>('brand-dna')?.getBrandDna() || null;
+  const [brandDna, setBrandDna] = useState<BrandDna | null>(() => hostBrandDna || resolveLiveBrandDna(null, tenantId));
+
+  const [viewMode, setViewMode] = useState<'pages' | 'editor' | 'public' | 'analytics-hub'>('pages');
+  const [pages, setPages] = useState<PageBuilderConfig[]>([]);
+  const [currentPage, setCurrentPage] = useState<PageBuilderConfig>(() => getInitialCleanPageConfig(brandDna, tenantId));
+
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isMarketingDrawerOpen, setIsMarketingDrawerOpen] = useState(false);
+  const [isShortenerModalOpen, setIsShortenerModalOpen] = useState(false);
+  const [selectedShortPage, setSelectedShortPage] = useState<PageBuilderConfig | null>(null);
+
+  // Load all pages and live Brand DNA from Firestore / LocalStorage
+  useEffect(() => {
+    let isMounted = true;
+    const loadData = async () => {
+      // 1. Immediately fetch existing pages so the dashboard displays instantly with zero delay!
+      let initialPages: PageBuilderConfig[] = [];
+      try {
+        initialPages = await pageBuilderFirestore.getAllPages(db || null, tenantId);
+        if (!isMounted) return;
+        if (initialPages.length > 0) {
+          const sanitized = initialPages.map((p) => sanitizeSectionConfig(p));
+          setPages(sanitized);
+          const home = sanitized.find((p) => p.isHomePage) || sanitized[0];
+          setCurrentPage(home);
+        } else if (tenantId === '_master') {
+          // On localhost dev, if _master has 0, check if mlea has pages
+          const mleaPages = await pageBuilderFirestore.getAllPages(db || null, 'mlea');
+          if (!isMounted) return;
+          if (mleaPages.length > 0) {
+            const sanitized = mleaPages.map((p) => sanitizeSectionConfig(p));
+            setPages(sanitized);
+            const home = sanitized.find((p) => p.isHomePage) || sanitized[0];
+            setCurrentPage(home);
+          }
+        }
+      } catch (err) {
+        console.warn('[PageBuilder] Initial getAllPages warning:', err);
+      }
+
+      // 2. Fetch live Brand DNA in background
+      let activeBrand = brandDna;
+      try {
+        const liveBrand = await loadBrandDna(db || undefined, tenantId);
+        if (liveBrand && isMounted) {
+          activeBrand = liveBrand;
+          setBrandDna(liveBrand);
+        }
+      } catch (err) {
+        console.warn('[PageBuilder] loadBrandDna warning:', err);
+      }
+
+      // 3. Automatically ensure Terms of Use, Privacy Policy, and 8 Archive Pages exist for this tenant
+      try {
+        await Promise.allSettled([
+          ensureDefaultLegalPages(db || null, tenantId, activeBrand),
+          ensureDefaultArchivePages(db || null, tenantId, activeBrand),
+        ]);
+        if (!isMounted) return;
+        const refreshed = await pageBuilderFirestore.getAllPages(db || null, tenantId);
+        if (isMounted && refreshed.length > 0) {
+          const sanitized = refreshed.map((p) => sanitizeSectionConfig(p));
+          setPages(sanitized);
+        }
+      } catch (err) {
+        console.warn('[PageBuilder] Auto-ensure default legal/archive pages warning:', err);
+      }
+    };
+
+    loadData();
+    return () => {
+      isMounted = false;
+    };
+  }, [db, tenantId]);
+
+  // Two-way synchronization: when Brand DNA updates anywhere in the system, refresh legal pages
+  useEffect(() => {
+    const unsub = eventBus.subscribe('brand:updated', async (data: any) => {
+      try {
+        if (data?.brandDna) {
+          setBrandDna(data.brandDna);
+          await syncLegalPagesWithBrandDna(db || null, tenantId, data.brandDna);
+          await syncArchivePagesWithBrandDna(db || null, tenantId, data.brandDna);
+          const refreshed = await pageBuilderFirestore.getAllPages(db || null, tenantId);
+          setPages(refreshed.map((p) => sanitizeSectionConfig(p)));
+        }
+      } catch (err) {
+        console.warn('[PageBuilder] Two-way legal pages sync on brand update error:', err);
+      }
+    });
+    return () => unsub();
+  }, [db, tenantId]);
+
+  // Save current page handler
+  const handleSavePage = async (updated: PageBuilderConfig) => {
+    const clean = sanitizeSectionConfig(updated);
+    setCurrentPage(clean);
+    await pageBuilderFirestore.savePage(clean, db, tenantId);
+    const all = await pageBuilderFirestore.getAllPages(db, tenantId);
+    setPages(all.map((p) => sanitizeSectionConfig(p)));
+  };
+
+  // Convert page to interactive video funnel
+  const handleConvertToVideo = (page: PageBuilderConfig) => {
+    try {
+      localStorage.setItem('sdo_video_studio_target_page_id', page.pageId);
+    } catch {}
+    navigate('/video-producer-studio');
+  };
+
+  const extractYouTubeId = (url?: string): string => {
+    if (!url) return 'dQw4w9WgXcQ';
+    const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+    return match ? match[1] : (url.length === 11 ? url : 'dQw4w9WgXcQ');
+  };
+
+  // Create new page categorized by type (KOSASS, KOSINFO, KOSEVENT, KOSFUNRISE, KOSTUBE, P)
+  const handleCreateNewPage = async (categoryOrOptions: PageCreationOptions | PageCategory = 'service_product') => {
+    const isOptionsObject = typeof categoryOrOptions === 'object' && categoryOrOptions !== null;
+    const options: PageCreationOptions = isOptionsObject
+      ? categoryOrOptions
+      : {
+          category: categoryOrOptions,
+          pageTitle: '',
+        };
+
+    const category: PageCategory = options.category || 'service_product';
+    const newId = `page_${Date.now()}`;
+    const baseInitial = getInitialCleanPageConfig(brandDna);
+
+    const categoryTemplates: Record<PageCategory, {
+      title: string;
+      slugPrefix: string;
+      sections: SectionType[];
+      keywords: string[];
+    }> = {
+      home: {
+        title: 'עמוד בית ראשי ומערכתי',
+        slugPrefix: '',
+        sections: ['header', 'hero', 'statsBento', 'dynamicListing', 'richContent', 'community', 'testimonials', 'faq', 'contact'],
+        keywords: ['עמוד בית', 'ראשי', 'שירותים', 'מוצרים', 'קהילה', 'אירועים'],
+      },
+      info_content: {
+        title: 'עמוד מידע ותוכן חדש',
+        slugPrefix: 'kosinfo',
+        sections: ['hero', 'richContent', 'statsBento', 'faq', 'testimonials', 'community', 'contact'],
+        keywords: ['מאמרים', 'מדריכים', 'מידע מקצועי', 'תוכן', 'בלוג'],
+      },
+      event: {
+        title: 'עמוד אירוע וכנס חדש',
+        slugPrefix: 'kosevent',
+        sections: ['hero', 'timer', 'eventRsvp', 'richContent', 'statsBento', 'faq', 'contact'],
+        keywords: ['אירוע', 'כנס', 'הרשמה', 'RSVP', 'Waze'],
+      },
+      checkout: {
+        title: 'דף סליקה ותשלום מאובטח',
+        slugPrefix: 'koscheckout',
+        sections: ['hero', 'pricing', 'smartForm', 'timer', 'testimonials', 'faq', 'contact'],
+        keywords: ['סליקה', 'תשלום', 'רכישה', 'מחירון', 'הזמנה מאובטחת'],
+      },
+      community: {
+        title: 'עמוד קהילה ומועדון חברים',
+        slugPrefix: 'koscommunity',
+        sections: ['hero', 'community', 'statsBento', 'livePosts', 'testimonials', 'faq', 'contact'],
+        keywords: ['קהילה', 'מועדון חברים', 'נטוורקינג', 'חברות', 'VIP'],
+      },
+      fundraising: {
+        title: 'קמפיין גיוס כספים ושגרירים',
+        slugPrefix: 'kosfunrise',
+        sections: ['campaignHeader', 'hero', 'campaignTiers', 'campaignDonors', 'statsBento', 'faq', 'contact'],
+        keywords: ['תרומות', 'קמפיין', 'שגרירים', 'גיוס כספים', 'סעיף 46'],
+      },
+      course: {
+        title: 'עמוד קורס והכשרה מקצועית',
+        slugPrefix: 'koscourse',
+        sections: ['hero', 'mainContent', 'statsBento', 'pricing', 'testimonials', 'faq', 'contact'],
+        keywords: ['קורס', 'סדנה', 'הכשרה', 'לימודים', 'אקדמיה', 'סילבוס'],
+      },
+      service_product: {
+        title: 'עמוד שירות / מוצר חדש',
+        slugPrefix: 'kosass',
+        sections: ['hero', 'pricing', 'smartForm', 'timer', 'testimonials', 'faq', 'contact'],
+        keywords: ['שירותים', 'מוצרים', 'הצעת מחיר', 'סליקה'],
+      },
+      youtube_post: {
+        title: 'עמוד פוסט וידאו KosTube',
+        slugPrefix: 'kostube',
+        sections: ['kosvidio', 'faq', 'contact'],
+        keywords: ['וידאו', 'יוטיוב', 'KosTube', 'תוכן'],
+      },
+      general: {
+        title: 'דף נחיתה כללי',
+        slugPrefix: 'p',
+        sections: ['hero', 'richContent', 'statsBento', 'pricing', 'testimonials', 'faq', 'contact'],
+        keywords: ['דף נחיתה', 'קמונה'],
+      },
+    };
+
+    const targetTemplate = categoryTemplates[category] || categoryTemplates.service_product;
+    const finalTitle = options.pageTitle?.trim() || targetTemplate.title;
+
+    // Build unique slug conforming to category prefix
+    let finalSlug = '';
+    const cleanPrefix = targetTemplate.slugPrefix;
+    if (category === 'home') {
+      finalSlug = 'home';
+    } else if (options.slugSuffix?.trim()) {
+      const cleanSuffix = options.slugSuffix
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]/g, '-')
+        .replace(/^-+|-+$/g, '');
+      finalSlug = cleanPrefix ? (cleanSuffix.startsWith(`${cleanPrefix}-`) ? cleanSuffix : `${cleanPrefix}-${cleanSuffix}`) : cleanSuffix;
+    } else {
+      const randomSuffix = Math.floor(Math.random() * 9000 + 1000);
+      finalSlug = cleanPrefix ? `${cleanPrefix}-${randomSuffix}` : `page-${randomSuffix}`;
+    }
+
+    const liveBrandDna = resolveLiveBrandDna(brandDna, tenantId);
+    const builtSections: Record<string, any> = {};
+    targetTemplate.sections.forEach((secType) => {
+      if (SECTION_REGISTRY[secType]) {
+        builtSections[secType] = hydrateSectionWithBrandDna(
+          { ...SECTION_REGISTRY[secType].defaultConfig, id: secType },
+          liveBrandDna,
+          secType,
+          tenantId
+        );
+      }
+    });
+
+    // Tailor section configurations according to wizard options
+    if (builtSections.hero) {
+      builtSections.hero.title = finalTitle;
+      if (options.description?.trim()) {
+        builtSections.hero.subtitle = options.description.trim();
+      }
+    }
+
+    if (category === 'event') {
+      if (builtSections.timer && options.eventDate) {
+        builtSections.timer.title = `הספירה לאחור לקראת: ${finalTitle}`;
+        builtSections.timer.targetDate = `${options.eventDate}T${options.eventTime || '19:30'}:00`;
+      }
+      if (builtSections.eventRsvp) {
+        builtSections.eventRsvp.eventTitle = finalTitle;
+        if (options.eventDate) builtSections.eventRsvp.eventDate = options.eventDate;
+        if (options.eventTime) builtSections.eventRsvp.eventTime = options.eventTime;
+        if (options.eventEndTime) builtSections.eventRsvp.eventEndTime = options.eventEndTime;
+        if (options.locationName) builtSections.eventRsvp.locationName = options.locationName;
+        if (options.locationAddress) builtSections.eventRsvp.locationAddress = options.locationAddress;
+        if (options.wazeQuery) builtSections.eventRsvp.wazeQuery = options.wazeQuery;
+        else if (options.locationAddress) builtSections.eventRsvp.wazeQuery = options.locationAddress;
+        if (options.description) builtSections.eventRsvp.description = options.description;
+        if (options.enableCalendarAdd !== undefined) builtSections.eventRsvp.showCalendarCard = options.enableCalendarAdd;
+        if (options.isPaidEvent) {
+          builtSections.eventRsvp.isPaidEvent = true;
+          builtSections.eventRsvp.ticketPrice = options.ticketPrice || 0;
+        }
+        if (options.enableCrmRsvp) {
+          builtSections.eventRsvp.enableCrmRsvp = true;
+          builtSections.eventRsvp.crmGroupName = options.crmGroupName || finalTitle;
+        }
+      }
+    } else if (category === 'service_product' || category === 'checkout') {
+      if (builtSections.pricing && options.servicePrice) {
+        const sPrice = options.servicePrice;
+        builtSections.pricing.packages = (builtSections.pricing.packages || []).map((pkg: any, idx: number) => {
+          if (idx === 1 || pkg.isFeatured) {
+            return {
+              ...pkg,
+              priceMonthly: `₪${sPrice}`,
+              priceYearly: `₪${Math.round(sPrice * 0.8)}`,
+              name: finalTitle,
+            };
+          }
+          return pkg;
+        });
+      }
+      if (builtSections.smartForm) {
+        builtSections.smartForm.sectionTitle = `סליקה מאובטחת - ${finalTitle}`;
+        if (options.servicePrice) {
+          builtSections.smartForm.sectionSubtitle = `סכום לתשלום: ₪${options.servicePrice} | מלאו את הפרטים והשלימו את הרכישה במיידי`;
+        }
+      }
+    } else if (category === 'community') {
+      if (builtSections.community) {
+        builtSections.community.title = `הטבות בלעדיות לחברי ${finalTitle}`;
+        if (options.description) {
+          builtSections.community.subtitle = options.description;
+        }
+      }
+    } else if (category === 'course') {
+      if (builtSections.mainContent) {
+        builtSections.mainContent.title = `תכנית הלימודים: ${finalTitle}`;
+        if (options.description) {
+          builtSections.mainContent.subtitle = options.description;
+        }
+      }
+      if (builtSections.pricing && options.servicePrice) {
+        const sPrice = options.servicePrice;
+        builtSections.pricing.title = 'מסלולי הרשמה לקורס';
+        builtSections.pricing.packages = (builtSections.pricing.packages || []).map((pkg: any, idx: number) => {
+          if (idx === 1 || pkg.isFeatured) {
+            return {
+              ...pkg,
+              priceMonthly: `₪${sPrice}`,
+              name: `מסלול מורחב: ${finalTitle}`,
+            };
+          }
+          return pkg;
+        });
+      }
+    } else if (category === 'fundraising') {
+      if (builtSections.campaignHeader) {
+        builtSections.campaignHeader.title = finalTitle;
+        if (options.targetGoal) builtSections.campaignHeader.targetGoal = options.targetGoal;
+        builtSections.campaignHeader.totalRaised = 0;
+        builtSections.campaignHeader.donorsCount = 0;
+      }
+      if (builtSections.campaignTiers && options.campaignTiers && options.campaignTiers.length > 0) {
+        builtSections.campaignTiers.tiers = options.campaignTiers.map((t, idx) => ({
+          id: String(idx + 1),
+          title: t.title,
+          amount: t.amount,
+          description: `תמיכה עבור ${t.title}`,
+          isPopular: idx === 1,
+          badgeText: idx === 1 ? 'הכי נבחר' : undefined,
+        }));
+      }
+    } else if (category === 'youtube_post') {
+      if (builtSections.kosvidio) {
+        builtSections.kosvidio.title = finalTitle;
+        if (options.youtubeUrl) {
+          builtSections.kosvidio.youtubeVideoId = extractYouTubeId(options.youtubeUrl);
+        }
+        if (options.description) {
+          builtSections.kosvidio.shortDescription = options.description;
+        }
+      }
+    } else if (category === 'info_content') {
+      if (builtSections.richContent && options.description) {
+        builtSections.richContent.heading = finalTitle;
+        builtSections.richContent.body = `<p>${options.description}</p>`;
+      }
+    }
+    const tenantDefaultPreset = (liveBrandDna?.designTokens?.defaultStylePreset as TenantStylePreset) || 'standard';
+    const styleTokens = STYLE_GLOBAL_THEMES[tenantDefaultPreset] || {};
+    const company = liveBrandDna?.identity?.companyName || (tenantId !== '_master' ? tenantId : 'המותג שלנו');
+    const homeDesc = options.description?.trim() || liveBrandDna?.identity?.slogan || 'שער הכניסה הדינמי לכל התכנים, המוצרים, השירותים והאירועים שלנו';
+
+    let newPage: PageBuilderConfig;
+
+    if (category === 'home') {
+      const blueprints = getPageBlueprints();
+      const homepageBp = blueprints.find((b) => b.id === 'ecosystem-homepage');
+      const baseBpConfig: PageBuilderConfig = homepageBp ? JSON.parse(JSON.stringify(homepageBp.config)) : baseInitial;
+
+      const homeSections: Record<string, any> = {};
+      Object.entries(baseBpConfig.sections || {}).forEach(([sId, secData]) => {
+        homeSections[sId] = hydrateSectionWithBrandDna(secData, liveBrandDna, secData?.type, tenantId);
+      });
+
+      if (homeSections['hero-1']) {
+        homeSections['hero-1'].title = finalTitle || `${company} - עמוד בית ראשי`;
+        homeSections['hero-1'].subtitle = homeDesc;
+      }
+      if (homeSections['directory-1']) {
+        homeSections['directory-1'].source = 'all';
+      }
+
+      newPage = {
+        ...baseBpConfig,
+        pageId: tenantId !== '_master' ? `home_${tenantId}` : 'home_master',
+        pageTitle: finalTitle || `${company} - עמוד בית ראשי`,
+        slug: 'home',
+        pageCategory: 'home',
+        published: true,
+        isHomePage: true,
+        viewsCount: 0,
+        leadsCount: 0,
+        globalSettings: {
+          ...baseBpConfig.globalSettings,
+          companyName: company,
+          siteTitle: `${company} | ${homeDesc}`,
+          slogan: homeDesc,
+          theme: tenantDefaultPreset,
+          layoutArchetype: options.layoutArchetype || 'bento_hub',
+          primaryColor: liveBrandDna?.designTokens?.primaryColor || styleTokens.primaryColor || '#6366f1',
+          secondaryColor: liveBrandDna?.designTokens?.secondaryColor || styleTokens.secondaryColor || '#0ea5e9',
+          buttonBgColor: liveBrandDna?.designTokens?.buttonBgColor || styleTokens.buttonBgColor || '#6366f1',
+          buttonTextColor: liveBrandDna?.designTokens?.buttonTextColor || styleTokens.buttonTextColor || '#ffffff',
+          borderRadius: (liveBrandDna?.designTokens?.borderRadius as any) || styleTokens.borderRadius || 'md',
+          buttonStyle: (liveBrandDna?.designTokens?.buttonStyle as any) || styleTokens.buttonStyle || 'gradient',
+          fontFamily: liveBrandDna?.designTokens?.fontFamily || 'Heebo, sans-serif',
+          siteLogoUrl: liveBrandDna?.identity?.logoUrl || baseBpConfig.globalSettings?.siteLogoUrl || '',
+          contactPhone: liveBrandDna?.trust?.contactPhone || '',
+          contactWhatsApp: liveBrandDna?.trust?.whatsappSupportNumber || '',
+          contactEmail: liveBrandDna?.trust?.contactEmail || '',
+          address: liveBrandDna?.trust?.officeAddress || '',
+        },
+        seoSettings: {
+          title: `${company} | ${homeDesc}`,
+          description: homeDesc,
+          keywords: ['עמוד בית', 'פורטל', company, 'שירותים', 'מוצרים', 'קהילה'],
+        },
+        sectionOrder: baseBpConfig.sectionOrder || ['header-1', 'hero-1', 'statsBento-1', 'directory-1', 'ecosystem-1', 'community-1', 'testimonials-1', 'faq-1', 'contact-1'],
+        sections: homeSections,
+      };
+    } else {
+      newPage = {
+        ...baseInitial,
+        pageId: newId,
+        pageTitle: finalTitle,
+        slug: finalSlug,
+        pageCategory: category,
+        published: false,
+        isHomePage: false,
+        viewsCount: 0,
+        leadsCount: 0,
+        globalSettings: {
+          ...baseInitial.globalSettings,
+          siteTitle: finalTitle,
+          theme: tenantDefaultPreset,
+          layoutArchetype: options.layoutArchetype,
+          primaryColor: liveBrandDna?.designTokens?.primaryColor || styleTokens.primaryColor || '#6366f1',
+          secondaryColor: liveBrandDna?.designTokens?.secondaryColor || styleTokens.secondaryColor || '#0ea5e9',
+          buttonBgColor: liveBrandDna?.designTokens?.buttonBgColor || styleTokens.buttonBgColor || liveBrandDna?.designTokens?.primaryColor || '#6366f1',
+          buttonTextColor: liveBrandDna?.designTokens?.buttonTextColor || styleTokens.buttonTextColor || '#ffffff',
+          borderRadius: (liveBrandDna?.designTokens?.borderRadius as any) || styleTokens.borderRadius || 'md',
+          buttonStyle: (liveBrandDna?.designTokens?.buttonStyle as any) || styleTokens.buttonStyle || 'gradient',
+          fontFamily: liveBrandDna?.designTokens?.fontFamily || 'Heebo, sans-serif',
+          companyName: company,
+          slogan: liveBrandDna?.identity?.slogan || '',
+          contactPhone: liveBrandDna?.trust?.contactPhone || '',
+          contactWhatsApp: liveBrandDna?.trust?.whatsappSupportNumber || '',
+          contactEmail: liveBrandDna?.trust?.contactEmail || '',
+          address: liveBrandDna?.trust?.officeAddress || '',
+        },
+        seoSettings: {
+          title: `${finalTitle} | ${PAGE_CATEGORIES[category]?.label || 'דף נחיתה'}`,
+          description: options.description || `עמוד ${PAGE_CATEGORIES[category]?.label || ''} מקצועי ומעוצב`,
+          keywords: targetTemplate.keywords,
+        },
+        sectionOrder: targetTemplate.sections,
+        sections: builtSections,
+      };
+    }
+
+    // If an archetype is chosen or creating a home page, apply archetype formatting & order
+    if (options.layoutArchetype || category === 'home') {
+      const targetArchetype = options.layoutArchetype || 'bento_hub';
+      const { updatedPage } = applyLayoutArchetypeToPage(newPage, targetArchetype, liveBrandDna, tenantId);
+      newPage = updatedPage;
+    }
+
+    // If it's a service/product page, register slug with BrandDNA contract
+    if (category === 'service_product') {
+      const brandContract = getCapability<BrandDnaContract>('brand-dna');
+      if (brandContract?.registerServicePageSlug) {
+        brandContract.registerServicePageSlug(newPage.pageId, newPage.slug);
+      }
+    }
+
+    await pageBuilderFirestore.savePage(newPage, db, tenantId);
+    const all = await pageBuilderFirestore.getAllPages(db, tenantId);
+    setPages(all);
+    setCurrentPage(newPage);
+    setViewMode('editor');
+  };
+
+  // Duplicate page
+  const handleDuplicatePage = async (page: PageBuilderConfig) => {
+    const duplicated = await pageBuilderFirestore.duplicatePage(page, db, tenantId);
+    const all = await pageBuilderFirestore.getAllPages(db, tenantId);
+    setPages(all);
+    setCurrentPage(duplicated);
+  };
+
+  // Delete page
+  const handleDeletePage = async (pageId: string) => {
+    if (confirm('האם למחוק עמוד זה לצמיתות?')) {
+      await pageBuilderFirestore.deletePage(pageId, db, tenantId);
+      const all = await pageBuilderFirestore.getAllPages(db, tenantId);
+      setPages(all);
+      if (currentPage.pageId === pageId && all.length > 0) {
+        setCurrentPage(all[0]);
+      }
+    }
+  };
+
+  // Set home page
+  const handleSetHomePage = async (pageId: string) => {
+    await pageBuilderFirestore.setHomePage(pageId, db, tenantId);
+    const all = await pageBuilderFirestore.getAllPages(db, tenantId);
+    setPages(all);
+    const updated = all.find((p) => p.pageId === currentPage.pageId);
+    if (updated) {
+      setCurrentPage(updated);
+    }
+  };
+
+  // Unset home page
+  const handleUnsetHomePage = async (_pageId: string) => {
+    await pageBuilderFirestore.setHomePage('', db, tenantId);
+    const all = await pageBuilderFirestore.getAllPages(db, tenantId);
+    setPages(all);
+    const updated = all.find((p) => p.pageId === currentPage.pageId);
+    if (updated) {
+      setCurrentPage(updated);
+    }
+  };
+
+  // Toggle publish
+  const handleTogglePublish = async (page: PageBuilderConfig) => {
+    const updated = await pageBuilderFirestore.togglePublish(page, db, tenantId);
+    const all = await pageBuilderFirestore.getAllPages(db, tenantId);
+    setPages(all);
+    if (currentPage.pageId === page.pageId) {
+      setCurrentPage(updated);
+    }
+  };
+
+  return (
+    <div className="w-full min-h-screen bg-slate-50 dark:bg-[#09090b] text-slate-900 dark:text-white select-none transition-colors duration-300">
+      {viewMode === 'pages' ? (
+        <PagesDashboardTab
+          pages={pages}
+          activePageId={currentPage.pageId}
+          brandDna={brandDna}
+          tenantId={tenantId}
+          onSwitchTenant={setTenantId}
+          onSelectPage={(page) => {
+            setCurrentPage(page);
+            setViewMode('editor');
+          }}
+          onNewPage={handleCreateNewPage}
+          onOpenAiBuilder={() => setIsAiModalOpen(true)}
+          onDuplicatePage={handleDuplicatePage}
+          onDeletePage={handleDeletePage}
+          onSetHomePage={handleSetHomePage}
+          onUnsetHomePage={handleUnsetHomePage}
+          onTogglePublish={handleTogglePublish}
+          onOpenShortener={(page) => {
+            setSelectedShortPage(page);
+            setIsShortenerModalOpen(true);
+          }}
+          onConvertToVideo={handleConvertToVideo}
+          onEnsureLegalPages={async () => {
+            try {
+              await ensureDefaultLegalPages(db || null, tenantId, brandDna);
+              const all = await pageBuilderFirestore.getAllPages(db || null, tenantId);
+              setPages(all);
+            } catch (err) {
+              console.warn('[PageBuilder] Manual legal pages creation error:', err);
+            }
+          }}
+          onEnsureArchivePages={async () => {
+            try {
+              await ensureDefaultArchivePages(db || null, tenantId, brandDna);
+              const all = await pageBuilderFirestore.getAllPages(db || null, tenantId);
+              setPages(all);
+            } catch (err) {
+              console.warn('[PageBuilder] Manual archive pages creation error:', err);
+            }
+          }}
+          onOpenAnalyticsHub={() => setViewMode('analytics-hub')}
+        />
+      ) : viewMode === 'analytics-hub' ? (
+        <GoogleAnalyticsConsoleHub onBackToPages={() => setViewMode('pages')} />
+      ) : (
+        <PageBuilderEditor
+          initialConfig={currentPage}
+          onSaveConfig={handleSavePage}
+          onGoToPagesList={() => setViewMode('pages')}
+          onClose={() => setViewMode('pages')}
+          onConvertToVideo={() => handleConvertToVideo(currentPage)}
+        />
+      )}
+
+      {/* AI Live Page Generator Modal (Dashboard view only) */}
+      {viewMode === 'pages' && (
+        <AiLivePageBuilderModal
+          isOpen={isAiModalOpen}
+          onClose={() => setIsAiModalOpen(false)}
+          onComplete={async (generatedConfig) => {
+            await pageBuilderFirestore.savePage(generatedConfig, db, tenantId);
+            const all = await pageBuilderFirestore.getAllPages(db, tenantId);
+            setPages(all);
+            setCurrentPage(generatedConfig);
+            setViewMode('editor');
+          }}
+          onOpenMarketingDrawer={() => {
+            setIsAiModalOpen(false);
+            setIsMarketingDrawerOpen(true);
+          }}
+        />
+      )}
+
+      {/* URL Shortener Modal */}
+      {selectedShortPage && (
+        <UrlShortenerModal
+          isOpen={isShortenerModalOpen}
+          onClose={() => setIsShortenerModalOpen(false)}
+          config={selectedShortPage}
+          onSaveShortUrl={async (shortUrl, shortSlug) => {
+            const updated = { ...selectedShortPage, shortUrl, shortSlug };
+            await pageBuilderFirestore.savePage(updated, db, tenantId);
+            const all = await pageBuilderFirestore.getAllPages(db, tenantId);
+            setPages(all);
+          }}
+        />
+      )}
+
+      {/* Brand DNA Marketing Ideas Drawer (Dashboard view only) */}
+      {viewMode === 'pages' && (
+        <ContinuousMarketingIdeasDrawer
+          isOpen={isMarketingDrawerOpen}
+          onClose={() => setIsMarketingDrawerOpen(false)}
+          onSelectIdea={(prompt) => {
+            setIsMarketingDrawerOpen(false);
+            setIsAiModalOpen(true);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+export const PageBuilderStandaloneView: React.FC = () => {
+  return (
+    <PageBuilderProvider>
+      <PageBuilderStandaloneViewInner />
+    </PageBuilderProvider>
+  );
+};
+
+export default PageBuilderStandaloneView;

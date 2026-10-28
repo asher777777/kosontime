@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getStorage } from 'firebase/storage';
 
 // 1. קונפיגורציית פרויקט KOSUN (המערכת המקומית)
 import kosunConfig from '../../firebase-applet-config.json';
@@ -26,6 +27,9 @@ const comonaApp = !getApps().some(app => app.name === 'comona')
 
 export const comonaDb = getFirestore(comonaApp);
 export const comonaAuth = getAuth(comonaApp);
+export const comonaStorage = getStorage(comonaApp);
+
+export const kosunStorage = getStorage(kosunApp);
 
 console.log('[Firebase Dual-Bridge] Successfully linked KOSUN & COMONA (glowmanage) instances!');
 

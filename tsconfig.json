@@ -17,7 +17,36 @@
     "allowJs": true,
     "jsx": "react-jsx",
     "paths": {
+      "@/core": [
+        "./src/core/index.ts",
+        "./src/core"
+      ],
+      "@/core/*": [
+        "./src/core/*"
+      ],
+      "@/services": [
+        "./src/services/index.ts",
+        "./src/services"
+      ],
+      "@/services/*": [
+        "./src/services/*"
+      ],
+      "@/modules": [
+        "./src/modules/index.ts",
+        "./src/modules"
+      ],
+      "@/modules/*": [
+        "./src/modules/*"
+      ],
+      "@/modols": [
+        "./src/modules/index.ts",
+        "./src/modules"
+      ],
+      "@/modols/*": [
+        "./src/modules/*"
+      ],
       "@/*": [
+        "./src/*",
         "./*"
       ]
     },
@@ -25,5 +54,5 @@
     "noEmit": true
   },
   "include": ["src", "server.ts", "vite.config.ts"],
-  "exclude": ["dist", "dev-dist", "KosBranding", "node_modules"]
+  "exclude": ["dist", "dev-dist", "KosBranding", "node_modules", "**/*.cjs", "src/**/scripts"]
 }

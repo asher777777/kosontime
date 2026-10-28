@@ -48,10 +48,17 @@ export default defineConfig(() => {
           enabled: true,
           type: 'module',
         },
+        workbox: {
+          maximumFileSizeToCacheInBytes: 15 * 1024 * 1024,
+        },
       }),
     ],
     resolve: {
       alias: {
+        '@/core': path.resolve(import.meta.dirname, 'src/core'),
+        '@/services': path.resolve(import.meta.dirname, 'src/services'),
+        '@/modules': path.resolve(import.meta.dirname, 'src/modols'),
+        '@/modols': path.resolve(import.meta.dirname, 'src/modols'),
         '@': path.resolve(import.meta.dirname, '.'),
       },
     },

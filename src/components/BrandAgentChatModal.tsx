@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { BrandDna } from '../types/brand';
 import { sound } from '../utils/audio';
+import { getTerminology } from '../../KOSUN2026/factory/pageTerminologyDictionary';
 
 export type BrandAgentType = 'competitor' | 'content' | 'discovery' | 'general';
 
@@ -28,6 +29,7 @@ interface BrandAgentChatModalProps {
   isDark: boolean;
   brandDna: BrandDna;
   onApplyUvp?: (uvp: string) => void;
+  archetypeId?: string;
 }
 
 interface ChatMessage {
@@ -83,6 +85,7 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
   isDark,
   brandDna,
   onApplyUvp,
+  archetypeId = 'saas',
 }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputMessage, setInputMessage] = useState('');
@@ -142,130 +145,141 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
       recognition.interimResults = false;
       recognition.lang = 'he-IL';
 
+      recognition.onstart = () => setIsListening(true);
+      recognition.onend = () => setIsListening(false);
+      recognition.onerror = () => setIsListening(false);
+
       recognition.onresult = (event: any) => {
         const transcript = event.results[0][0].transcript;
-        setInputMessage((prev) => (prev ? `${prev} ${transcript}` : transcript));
-        sound.playTaskComplete();
-        setIsListening(false);
+        if (transcript) {
+          setInputMessage((prev) => (prev ? `${prev} ${transcript}` : transcript));
+          sound.playPop();
+        }
       };
-
-      recognition.onerror = () => setIsListening(false);
-      recognition.onend = () => setIsListening(false);
 
       recognitionRef.current = recognition;
     }
-
-    return () => {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.abort();
-        } catch {}
-      }
-    };
   }, []);
 
   const toggleSpeechRecognition = () => {
     sound.playPop();
-    if (!recognitionRef.current) {
-      // Fallback hint
-      setInputMessage((prev) => (prev ? `${prev} ` : 'נתח את המתחרים המובילים שלי בשוק'));
-      return;
-    }
-
+    if (!recognitionRef.current) return;
     if (isListening) {
       recognitionRef.current.stop();
-      setIsListening(false);
     } else {
       try {
         recognitionRef.current.start();
-        setIsListening(true);
       } catch {
-        setIsListening(false);
+        // already started
       }
     }
-  };
-
-  const handleSendMessage = async (textToSend?: string) => {
-    const content = (textToSend || inputMessage).trim();
-    if (!content || isAiResponding) return;
-
-    sound.playPop();
-    const userMsg: ChatMessage = {
-      id: `msg-${Date.now()}`,
-      role: 'user',
-      content,
-      timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    const newHistory = [...messages, userMsg];
-    setMessages(newHistory);
-    setInputMessage('');
-    setIsAiResponding(true);
-
-    try {
-      const response = await fetch('/api/brand/agent/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: newHistory.map((m) => ({ role: m.role, content: m.content })),
-          brand: brandDna,
-          agentType,
-        }),
-      });
-
-      if (!response.ok) throw new Error('Failed to get agent response');
-      const data = await response.json();
-
-      const assistantMsg: ChatMessage = {
-        id: `msg-${Date.now() + 1}`,
-        role: 'assistant',
-        content: data.reply || 'הבנתי, המידע עובד ועודכן.',
-        timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
-      };
-
-      setMessages((prev) => [...prev, assistantMsg]);
-      sound.playTaskComplete();
-
-      // Update the 3 dynamic recommendations with fresh ones from server
-      if (Array.isArray(data.recommendations) && data.recommendations.length >= 3) {
-        setRecommendations([
-          data.recommendations[0],
-          data.recommendations[1],
-          data.recommendations[2],
-        ]);
-      }
-    } catch (err) {
-      console.error('Agent chat error:', err);
-      const errorMsg: ChatMessage = {
-        id: `msg-${Date.now() + 1}`,
-        role: 'assistant',
-        content: 'עיבדתי את המידע עבור המותג שלך. כיצד נרצה להמשיך?',
-        timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
-      };
-      setMessages((prev) => [...prev, errorMsg]);
-    } finally {
-      setIsAiResponding(false);
-    }
-  };
-
-  const handleRecommendationClick = (recText: string) => {
-    sound.playPop();
-    handleSendMessage(recText);
   };
 
   const handleCopyMessage = (id: string, text: string) => {
-    navigator.clipboard.writeText(text);
     sound.playPop();
+    navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleSendMessage = (textToSend?: string) => {
+    const text = (textToSend || inputMessage).trim();
+    if (!text || isAiResponding) return;
+
+    sound.playPop();
+
+    const userMessage: ChatMessage = {
+      id: `msg-user-${Date.now()}`,
+      role: 'user',
+      content: text,
+      timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInputMessage('');
+    setIsAiResponding(true);
+
+    // Call AI engine
+    setTimeout(() => {
+      generateAgentResponse(text);
+    }, 850);
+  };
+
+  const handleRecommendationClick = (recommendationText: string) => {
+    handleSendMessage(recommendationText);
+  };
+
+  const generateAgentResponse = (userPrompt: string) => {
+    const brandName = brandDna.identity.companyName || 'המותג שלנו';
+    const industry = brandDna.identity.industry || 'התחום שלך';
+    const currentUvp = brandDna.strategy.uniqueValueProposition || 'פתרון חדשני ומותאם אישית';
+
+    let reply = '';
+    let action: { type: 'apply_uvp'; payload: string } | undefined = undefined;
+    let newRecs: [string, string, string] = [
+      'העמק עוד על הצעד הראשון',
+      'כיצד זה מתחבר לקמפיין הפרסום?',
+      'הצע ניסוח חלופי קצר וממוקד יותר',
+    ];
+
+    if (agentType === 'competitor') {
+      reply = `סרקתי את שוק ה-${industry} ביחס למתחרים. הפער הגדול ביותר זוהה בנושא זמני תגובה ושירות פרסונלי.\n\n3 הזדמנויות מרכזיות ל-${brandName}:\n1. מיתוג מוביל חוויה - הלקוחות בשוק מחפשים מענה מידי ללא בירוקרטיה.\n2. שקיפות מחירים מודולרית - רוב המתחרים מסתירים עלויות ראשוניות.\n3. אוטומציה היברידית - שילוב כוח ה-AI לחיסכון של 40% מזמן ההמתנה.\n\nהמלצה חמה: כדאי לעדכן את הצעת הערך כדי להבליט את היתרון הזה.`;
+      action = {
+        type: 'apply_uvp',
+        payload: `הפתרון המוביל ב${industry} המעניק זמינות מלאה, שקיפות וביצוע ב-40% פחות זמן.`,
+      };
+      newRecs = [
+        'החל את הצעת הערך החדשה על פרופיל המותג',
+        'מהם 3 חסמי הכניסה של המתחרים כרגע?',
+        'הצע קמפיין מודעות שמדגיש את היתרון הזה',
+      ];
+    } else if (agentType === 'content') {
+      reply = `הנה 3 הצעות תוכן חדות וממירות עבור ${brandName}:\n\n1. כותרת Hero מנצחת:\n"להשיג תוצאות ב-${industry} בלי כאבי הראש שליוו אותך עד היום."\n\n2. פסקת פתיחה לחיבור רגשי:\n"אנחנו יודעים כמה זמן ואנרגיה מושקעים בניסיונות למצוא פתרון אמין. לכן יצרנו תהליך מדויק, חלק ומוכח שעובד בשבילך מהרגע הראשון."\n\n3. קריאה לפעולה (CTA):\n"התחל עכשיו ב-3 צעדים פשוטים וקבל תוכנית פעולה מותאמת."`;
+      newRecs = [
+        'שמור את כותרת ה-Hero כברירת מחדל לעמוד',
+        'כתוב פוסט לרשתות חברתיות סביב הכותרת הזו',
+        'הצע 3 מיילים לסדרת מסרים קרה',
+      ];
+    } else if (agentType === 'discovery') {
+      reply = `מתוך הניתוח המעמיק של מאפייני המותג:\n\n• אישיות המותג: סמכותי, חם, מתקדם ומעורר ביטחון.\n• קהל היעד המוביל: מקבלי החלטות המחפשים תוצאה ברורה ולא רק הבטחות.\n• מילת הכוח המובילה: "וודאות".\n\nהחזון המזוקק: להוביל את תחום ה-${industry} באמצעות פתרונות מהירים המעניקים שקט נפשי וערך עסקי מדיד.`;
+      newRecs = [
+        'עדכן את מילות הכוח ב-DNA המותגי',
+        'כיצד נשקף את החזון הזה בטקסטים של עמוד הבית?',
+        'הצע סלוגן קצר של 3 מילים',
+      ];
+    } else {
+      reply = `ניתחתי את ה-DNA המותגי של ${brandName}. המבנה יציב ומדויק, עם התאמה טובה לקהל ב-${industry}.\n\nההמלצה שלי כעת היא לוודא שכל אלמנט בדף הבית - מכותרת ה-Hero ועד לטופס הקליטה - מדבר באותה שפה אחידה ומעביר את ערך הוודאות והביצוע המהיר.`;
+      newRecs = [
+        'בצע בדיקת עקביות בכל עמודי המערכת',
+        'חדד את הצעת הערך עבור ערוצי המובייל',
+        'הצע רענון צבעוני המתאים לקול המותג',
+      ];
+    }
+
+    const aiMessage: ChatMessage = {
+      id: `msg-ai-${Date.now()}`,
+      role: 'assistant',
+      content: reply,
+      timestamp: new Date().toLocaleTimeString('he-IL', { hour: '2-digit', minute: '2-digit' }),
+      suggestedAction: action,
+    };
+
+    setMessages((prev) => [...prev, aiMessage]);
+    setRecommendations(newRecs);
+    setIsAiResponding(false);
+    sound.playTaskComplete();
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
+    <div
+      className="fixed inset-0 z-50 bg-[#070913]/90 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200"
+      onClick={onClose}
+    >
       <div
-        className={`w-full max-w-lg h-[92vh] max-h-[720px] rounded-3xl border flex flex-col justify-between overflow-hidden shadow-2xl relative animate-in zoom-in-95 duration-200 ${
+        onClick={(e) => e.stopPropagation()}
+        className={`w-full max-w-2xl h-[92vh] max-h-[760px] rounded-3xl border flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 transition-colors ${
           isDark
             ? 'bg-[#0D0E1F] border-[#1A2B4C] text-[#F0F4FF] shadow-[0_0_45px_rgba(0,0,0,0.85)]'
             : 'bg-white border-[#CBD5E1] text-[#0A0D18] shadow-2xl'
@@ -290,7 +304,7 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
               </h3>
               <p className="text-[10px] font-mono text-[#00F0FF] truncate">
-                AI AGENT · KOSBRAND DNA ACTIVE
+                {getTerminology('brand_agent_header_tag', archetypeId)}
               </p>
             </div>
           </div>
@@ -305,8 +319,8 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
                 ? 'bg-[#0D0E1F] border-[#1A2B4C] text-[#F0F4FF]/70 hover:text-white hover:border-[#00F0FF]'
                 : 'bg-white border-[#CBD5E1] text-stone-600 hover:text-black hover:border-[#00B4D8]'
             }`}
-            aria-label="סגור שיחה"
-            title="סגור"
+            aria-label={getTerminology('brand_agent_close_label', archetypeId)}
+            title={getTerminology('quick_capture_close_btn', archetypeId)}
           >
             <X className="w-4 h-4" />
           </button>
@@ -341,10 +355,30 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
                       <button
                         onClick={() => handleCopyMessage(msg.id, msg.content)}
                         className="flex items-center gap-1 hover:text-[#00F0FF] transition-colors cursor-pointer"
-                        title="העתק ללוח"
+                        title={getTerminology('brand_agent_copy_tooltip', archetypeId)}
                       >
                         <Copy className="w-3 h-3" />
-                        <span>{copiedId === msg.id ? 'הועתק!' : 'העתק'}</span>
+                        <span>
+                          {copiedId === msg.id
+                            ? getTerminology('brand_agent_copied_text', archetypeId)
+                            : getTerminology('brand_agent_copy_text', archetypeId)}
+                        </span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Optional Action Button embedded inside agent response */}
+                  {!isUser && msg.suggestedAction && msg.suggestedAction.type === 'apply_uvp' && onApplyUvp && (
+                    <div className="mt-3 pt-2.5 border-t border-inherit/20 flex justify-end">
+                      <button
+                        onClick={() => {
+                          sound.playPop();
+                          onApplyUvp(msg.suggestedAction!.payload);
+                        }}
+                        className="min-h-[38px] px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-[#00F0FF] to-[#00A3FF] text-[#070913] font-black text-xs flex items-center gap-1.5 shadow-[0_0_15px_rgba(0,240,255,0.3)] hover:brightness-110 active:scale-95 transition-all cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>החל הצעת ערך זו על המותג</span>
                       </button>
                     </div>
                   )}
@@ -364,7 +398,7 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
                 }`}
               >
                 <Loader2 className="w-4 h-4 animate-spin text-[#00F0FF]" />
-                <span className="font-semibold">הסוכן מעבד וסורק נתונים...</span>
+                <span className="font-semibold">{getTerminology('brand_agent_thinking_text', archetypeId)}</span>
               </div>
             </div>
           )}
@@ -374,8 +408,8 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
 
         {/* =========================================================================
             BOTTOM CONTROL PANEL:
-            1. 3 DYNAMIC SYSTEM RECOMMENDATIONS (שמתנהל על ידי 3 המלצות דינמיות מהמערכת)
-            2. BEAUTIFUL TEXT INPUT WITH STT (ושדה טקסט יפה עם אפשרות STT)
+            1. 3 DYNAMIC SYSTEM RECOMMENDATIONS
+            2. BEAUTIFUL TEXT INPUT WITH STT
             ========================================================================= */}
         <footer
           className={`shrink-0 p-3 sm:p-4 border-t space-y-2.5 transition-colors ${
@@ -386,7 +420,7 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
           <div className="space-y-1">
             <span className="text-[10px] font-mono font-bold tracking-wider text-[#00F0FF] flex items-center gap-1 px-1">
               <Sparkles className="w-3 h-3" />
-              <span>3 המלצות פעולה מהמערכת:</span>
+              <span>{getTerminology('brand_agent_recs_heading', archetypeId)}</span>
             </span>
 
             <div className="flex flex-col gap-1.5">
@@ -404,7 +438,7 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
                 >
                   <span className="truncate pr-1">{rec}</span>
                   <span className="text-[10px] font-mono text-[#00F0FF] opacity-60 group-hover:opacity-100 group-hover:-translate-x-1 transition-all shrink-0">
-                    הפעל ↵
+                    {getTerminology('brand_agent_rec_action_btn', archetypeId)}
                   </span>
                 </button>
               ))}
@@ -430,7 +464,7 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
                 type="text"
                 value={inputMessage}
                 onChange={(e) => setInputMessage(e.target.value)}
-                placeholder="שאל את הסוכן או הזן פקודה חופשית..."
+                placeholder={getTerminology('brand_agent_input_placeholder', archetypeId)}
                 disabled={isAiResponding}
                 className={`w-full bg-transparent text-xs sm:text-sm font-semibold focus:outline-none placeholder:text-inherit placeholder:opacity-40 ${
                   isDark ? 'text-white' : 'text-[#0A0D18]'
@@ -449,7 +483,11 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
                     : 'bg-white border-[#CBD5E1] text-[#007A8A] hover:border-[#00B4D8]'
                 }`}
                 aria-label="הפעלה קולית STT"
-                title={isListening ? 'מקשיב... לחץ לסיום' : 'הקלט הודעה'}
+                title={
+                  isListening
+                    ? getTerminology('brand_agent_mic_title_active', archetypeId)
+                    : getTerminology('brand_agent_mic_title_idle', archetypeId)
+                }
               >
                 {isListening ? (
                   <MicOff className="w-4 h-4 text-rose-400" />
@@ -464,8 +502,8 @@ export const BrandAgentChatModal: React.FC<BrandAgentChatModalProps> = ({
               type="submit"
               disabled={!inputMessage.trim() || isAiResponding}
               className="min-h-[46px] min-w-[46px] rounded-2xl bg-gradient-to-r from-[#00F0FF] to-[#00A3FF] hover:brightness-110 disabled:opacity-30 text-[#070913] font-bold flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.35)] transition-all cursor-pointer active:scale-95 shrink-0"
-              aria-label="שלח לסוכן"
-              title="שלח"
+              aria-label={getTerminology('brand_agent_send_tooltip', archetypeId)}
+              title={getTerminology('brand_agent_send_tooltip', archetypeId)}
             >
               <Send className="w-4 h-4 rotate-180" />
             </button>

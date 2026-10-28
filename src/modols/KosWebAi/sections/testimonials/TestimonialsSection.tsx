@@ -1,0 +1,155 @@
+import { getKoswebTerminology } from '../../services/koswebSectionThemeBridge';
+import React from 'react';
+import { TestimonialsSectionConfig } from '../../types/sectionConfigs';
+import { Star, CheckCircle2, Quote } from 'lucide-react';
+
+export const TestimonialsSection: React.FC<{ config: TestimonialsSectionConfig }> = ({ config }) => {
+  if (config?.visible === false) {
+    return null;
+  }
+
+  const rawItems = Array.isArray(config?.items) ? config.items : [];
+  // Strict rule: "אין פול באק !!! אין נתונים אזור לא מופיע"
+  // Must have actual testimonial items with valid content and name
+  const validItems = rawItems.filter(
+    (item) => item && (item.content?.trim() || item.name?.trim())
+  );
+
+  if (validItems.length === 0) {
+    return null;
+  }
+
+  const {
+    anchorId,
+    title = config.title || getKoswebTerminology('sec_testimonials_title', 'מה הלקוחות שלנו מספרים?'),
+    subtitle = config.subtitle || getKoswebTerminology('sec_testimonials_subtitle', 'המלצות וביקורות מאומתות'),
+    description,
+    backgroundColor = 'transparent',
+    showRatingSummary = false,
+    overallRating = 5.0,
+    totalReviewsCount,
+    trustBadgeText = config.trustBadgeText || getKoswebTerminology('sec_testimonials_verified', 'לקוחות מאומתים 100%'),
+  } = config;
+
+  return (
+    <section
+      id={anchorId || 'testimonials'}
+      className="w-full py-16 md:py-24 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
+      style={{ backgroundColor: backgroundColor !== 'transparent' ? backgroundColor : undefined }}
+      dir="rtl"
+    >
+      {/* Background soft ambient glow */}
+      <div className="absolute top-1/2 left-1/4 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-10 right-1/4 w-80 h-80 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="max-w-7xl mx-auto flex flex-col gap-12 relative z-10">
+        {/* Header & Rating Summary */}
+        <div className="text-center max-w-3xl mx-auto flex flex-col items-center gap-4">
+          {subtitle && (
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs font-bold">
+              <span>{subtitle}</span>
+            </div>
+          )}
+          {title && (
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+              {title}
+            </h2>
+          )}
+          {description && (
+            <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 font-normal leading-relaxed">
+              {description}
+            </p>
+          )}
+
+          {showRatingSummary && (
+            <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
+              <div className="flex items-center gap-1">
+                {[...Array(5)].map((_, i) => (
+                  <Star key={i} className="w-5 h-5 fill-amber-400 text-amber-400" />
+                ))}
+              </div>
+              <span className="text-sm font-bold text-slate-900 dark:text-white">
+                {overallRating} {getKoswebTerminology('sec_testimonials_out_of', 'מתוך')} 5.0
+              </span>
+              {totalReviewsCount && (
+                <span className="text-xs text-slate-500 dark:text-slate-400">({totalReviewsCount})</span>
+              )}
+              {trustBadgeText && (
+                <div className="inline-flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{trustBadgeText}</span>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Testimonials Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 items-stretch">
+          {validItems.map((item) => (
+            <div
+              key={item.id}
+              className="relative bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 sm:p-8 flex flex-col justify-between backdrop-blur-xl shadow-xl hover:border-indigo-500/40 hover:-translate-y-1.5 transition-all duration-300 group"
+            >
+              <div className="flex flex-col gap-4 text-right">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    {[...Array(item.rating || 5)].map((_, i) => (
+                      <Star key={i} className="w-4 h-4 fill-amber-400 text-amber-400" />
+                    ))}
+                  </div>
+                  <Quote className="w-6 h-6 text-indigo-500/30 group-hover:text-indigo-400 transition-colors" />
+                </div>
+
+                {item.content && (
+                  <p className="text-sm sm:text-base text-slate-700 dark:text-slate-200 leading-relaxed font-normal">
+                    {item.content}
+                  </p>
+                )}
+              </div>
+
+              <div className="pt-6 mt-6 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                <div className="flex items-center gap-3 text-right">
+                  {item.avatarUrl ? (
+                    <img
+                      src={item.avatarUrl}
+                      alt={item.name || 'avatar'}
+                      className="w-11 h-11 rounded-full object-cover border border-slate-200 dark:border-slate-700 shadow-md"
+                    />
+                  ) : item.name ? (
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center font-bold text-white text-sm">
+                      {item.name.charAt(0)}
+                    </div>
+                  ) : null}
+                  <div>
+                    {item.name && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-sm font-bold text-slate-900 dark:text-white">{item.name}</span>
+                        {item.isVerified !== false && (
+                          <span title={getKoswebTerminology('sec_testimonials_verified_customer_tooltip', 'לקוח מאומת')}>
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 dark:text-emerald-400" />
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {(item.role || item.company) && (
+                      <span className="text-xs text-slate-500 dark:text-slate-400 block">
+                        {[item.role, item.company].filter(Boolean).join(' • ')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {item.badge && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+                    {item.badge}
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};

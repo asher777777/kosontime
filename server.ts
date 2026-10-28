@@ -492,148 +492,135 @@ const SYSTEM_KNOWLEDGE_BASE = [
   },
 ];
 
-// Universal Vector / Semantic AI Assistant Endpoint
+// Universal Vector / Semantic AI Assistant Endpoint with Tenant Context & 4 Cards Layout
 app.post('/api/ai/vector-assistant', async (req, res) => {
-  const { query, currentScreen, userTasks, brandDna, inboxCount } = req.body;
+  const { query, currentScreen, userTasks, brandDna, tenantId = 'turbo_motors', inboxCount } = req.body;
 
   if (!query || typeof query !== 'string') {
     return res.status(400).json({ error: 'Query is required' });
   }
 
   try {
-    // 1. Vector / Keyword Semantic matching score computation
-    const normalizedQuery = query.toLowerCase().trim();
-    const scoredActions = SYSTEM_KNOWLEDGE_BASE.map((item) => {
-      let score = 0;
-      for (const kw of item.keywords) {
-        if (normalizedQuery.includes(kw.toLowerCase())) {
-          score += 2;
-        }
-      }
-      if (item.title.toLowerCase().includes(normalizedQuery)) score += 3;
-      if (item.description.toLowerCase().includes(normalizedQuery)) score += 1;
-      return { ...item, score };
-    })
-      .sort((a, b) => b.score - a.score);
-
-    // 2. Prepare Context for Gemini 3.8 Flash
-    const activeTasksSummary = Array.isArray(userTasks)
-      ? userTasks.map((t: any) => `• ${t.title} (${t.completed ? 'הושלמה' : 'פעילה'}, ${t.estimatedMinutes || 25} דק')`).join('\n')
-      : 'אין משימות פעילות כרגע';
-
     const brandSummary = brandDna?.identity?.companyName
       ? `שם: ${brandDna.identity.companyName}, סלוגן: ${brandDna.identity.slogan || 'ללא'}, UVP: ${brandDna.audience?.mainUvp || 'טרם הוגדר'}`
-      : 'מותג KOSUN ברירת מחדל';
+      : 'טורבו מוטורס - סוכנות רכבי ספורט ויוקרה (הרצליה פיתוח)';
 
-    const systemPrompt = `אתה העוזר החכם של מערכת KOSUN הפועל על פי המתודה: "הצג מידע וקיום פעולות באופן של מיעוט הסחות דעת וכיוון למטרה" (Zero Distraction & Goal-Oriented Action).
-תפקידך לשרת מקצוענים עסקיים (בני 30+) בצורה ממוקדת, אלגנטית ומיידית.
+    const systemPrompt = `אתה KOSAI - מנוע הבינה העסקית והסוכן הראשי של מערכת KOSUN והטננט (${tenantId}).
+עקרון היסוד של KOSUN: "הצג מידע וקיום פעולות באופן של מיעוט הסחות דעת, אפס גלילה, כיוון למטרה במרכז והקרנת בדיוק 4 כרטיסיות מעוצבות מתוך ה-JSON".
+תפקידך לתת תשובה מדויקת, עסקית, קצרה וחדה בעברית, ולהקרין תמיד בדיוק 4 כרטיסיות מעוצבות עם פריסה מתוך ה-JSON!
 
-ההקשר הנוכחי במערכת:
-- מסך נוכחי: ${currentScreen || 'home'}
-- משימות היום:
-${activeTasksSummary}
-- פריטי אינבוקס: ${inboxCount || 0}
-- נתוני מותג KOSUN: ${brandSummary}
+ההקשר הנוכחי:
+- טננט פעיל: ${tenantId} (${brandSummary})
+- מוצרים זמינים במלאי: BMW M4 Competition (₪685,000), Porsche Taycan 4S (₪740,000), Mercedes-AMG G63 (₪1,390,000), Audi RS6 Avant (₪890,000).
+- סניפים: סניף ראשי בהרצליה פיתוח (רחוב המלאכה 12), ראשון לציון וחיפה. שעות פתיחה: א-ה 09:00-19:00, ו 08:30-13:30. נסיעות מבחן מלוות של 45 דק'.
 
 הנחיות קריטיות:
-1. "הסבר ממוקד": ספק תשובה ישירה, קצרה וחדה בעברית (2-3 משפטים בלבד, ללא גינונים ומלל עודף).
-2. "קישורי פעולה וניווט": צרף 1 עד 3 כפתורי פעולה/ניווט ישירים למסך הרלוונטי או לביצוע המשימה. השתמש ב-targetScreen ('today', 'inbox', 'branding', 'decompose', 'home') או targetAction ('quick_capture', 'evening_ritual').
-3. "4 המלצות דינמיות": חובה להחזיר בדיוק 4 המלצות קצרות (עד 7 מילים) עבור כפתורי המלצה דינמיים במרכז החלון שהמשתמש יוכל ללחוץ עליהם מיידית.
+1. "הסבר ממוקד": ספק משפט אחד או שניים בלבד (עד 25 מילים) המסכמים את התשובה בצורה ישירה ורהוטה.
+2. "הקרנת 4 כרטיסיות (cards)": חובה להחזיר בדיוק 4 כרטיסיות עשירות המותאמות לשאלה! לכל כרטיסייה:
+   - title: כותרת קצרה וקולעת (עד 5 מילים)
+   - subtitle: פירוט קצר ומדויק
+   - badge: תגית מודגשת קצרה (למשל: "מלאי מיידי", "וויז", "נסיעת מבחן", "סניף מרכזי")
+   - icon: שם אייקון מ-Lucide (למשל: Car, Gauge, MapPin, KeyRound, Sparkles, ShieldCheck, Flame, Zap)
+   - actionType: סוג פעולה (DRILL_DOWN_PRODUCT, OPEN_ADDRESS, BOOK_TEST_DRIVE, CALL_AGENT)
+   - highlightColor: צבע הילה (#00F0FF, #F59E0B, #10B981, #EC4899)
+3. "layout": פריסת הכרטיסיות (grid_2x2 או vertical_pills).
 
 החזר JSON בלבד במבנה הבא:
 {
-  "reply": "הסבר ממוקד ותמציתי בעברית לפי המתודה",
-  "actionLinks": [
+  "reply": "תשובה ממוקדת של משפט אחד או שניים",
+  "layout": "grid_2x2",
+  "cards": [
     {
-      "id": "NAVIGATE_TODAY",
-      "label": "מעבר לניהול 3 משימות היום",
-      "description": "הפעלת שעון מיקוד וביצוע המשימות",
-      "targetScreen": "today",
-      "icon": "Clock"
+      "id": "c1",
+      "title": "כותרת כרטיסייה 1",
+      "subtitle": "פירוט תמציתי",
+      "badge": "תג 1",
+      "icon": "Car",
+      "actionType": "DRILL_DOWN_PRODUCT",
+      "highlightColor": "#00F0FF"
+    },
+    {
+      "id": "c2",
+      "title": "כותרת כרטיסייה 2",
+      "subtitle": "פירוט תמציתי",
+      "badge": "תג 2",
+      "icon": "Gauge",
+      "actionType": "BOOK_TEST_DRIVE",
+      "highlightColor": "#F59E0B"
+    },
+    {
+      "id": "c3",
+      "title": "כותרת כרטיסייה 3",
+      "subtitle": "פירוט תמציתי",
+      "badge": "תג 3",
+      "icon": "MapPin",
+      "actionType": "OPEN_ADDRESS",
+      "highlightColor": "#10B981"
+    },
+    {
+      "id": "c4",
+      "title": "כותרת כרטיסייה 4",
+      "subtitle": "פירוט תמציתי",
+      "badge": "תג 4",
+      "icon": "KeyRound",
+      "actionType": "CALL_AGENT",
+      "highlightColor": "#EC4899"
     }
   ],
   "recommendations": [
-    "המלצה דינמית 1",
-    "המלצה דינמית 2",
-    "המלצה דינמית 3",
-    "המלצה דינמית 4"
-  ],
-  "matchedDataSummary": "סיכום תמציתי של נתון שנמצא (אופציונלי)"
+    "שאלה נוספת 1",
+    "שאלה נוספת 2",
+    "שאלה נוספת 3",
+    "שאלה נוספת 4"
+  ]
 }`;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.8-flash',
-      contents: `שאילתת המשתמש:\n"${query}"\n\nפעולות שהכי התאימו בחיפוש וקטורי ראשוני: ${scoredActions.slice(0, 3).map((a) => a.title).join(', ')}`,
+      contents: `שאלת המשתמש ל-KOSAI:\n"${query}"`,
       config: {
         systemInstruction: systemPrompt,
-        temperature: 0.6,
+        temperature: 0.5,
         responseMimeType: 'application/json',
       },
     });
 
     const parsed = JSON.parse(response.text?.trim() || '{}');
 
-    // Ensure recommendations always has exactly 4 items
-    const recs: string[] = Array.isArray(parsed.recommendations) && parsed.recommendations.length >= 4
-      ? parsed.recommendations.slice(0, 4)
-      : [
-          '🎯 פתח את משימות היום שלי',
-          '🎨 עדכן את הצעת הערך במיתוג',
-          '⚡ קלוט קושאן חדש בקול',
-          '🌙 בדוק תכנון לטקס הערב',
-        ];
-
-    // Ensure actionLinks fallback if empty
-    const actionLinks = Array.isArray(parsed.actionLinks) && parsed.actionLinks.length > 0
-      ? parsed.actionLinks
-      : scoredActions.slice(0, 2).map((a) => ({
-          id: a.id,
-          label: a.title,
-          description: a.description,
-          targetScreen: a.targetScreen,
-          targetAction: a.targetAction,
-          icon: a.icon,
-        }));
-
     return res.json({
-      reply: parsed.reply || 'המידע הוצג. תוכל לנווט ישירות לביצוע הפעולה או לבחור באחת ההמלצות:',
-      actionLinks,
-      recommendations: recs,
-      matchedDataSummary: parsed.matchedDataSummary || null,
+      reply: parsed.reply || 'הנה המידע המבוקש מתוך מאגר KOSAI:',
+      layout: parsed.layout || 'grid_2x2',
+      cards: Array.isArray(parsed.cards) && parsed.cards.length === 4 ? parsed.cards : [
+        { id: '1', title: 'קטלוג רכבי ספורט', subtitle: '4 רכבי יוקרה במלאי מיידי', badge: 'מלאי', icon: 'Car', actionType: 'DRILL_DOWN_PRODUCT', highlightColor: '#00F0FF' },
+        { id: '2', title: 'תיאום נסיעת מבחן', subtitle: '45 דקות נהיגה עם יועץ אישי', badge: 'בדיקה', icon: 'KeyRound', actionType: 'BOOK_TEST_DRIVE', highlightColor: '#F59E0B' },
+        { id: '3', title: 'סניפים והגעה', subtitle: 'הרצליה פיתוח, ראשון לציון וחיפה', badge: 'מיקום', icon: 'MapPin', actionType: 'OPEN_ADDRESS', highlightColor: '#10B981' },
+        { id: '4', title: 'ייעוץ מימון וטרייד-אין', subtitle: 'פתרונות מימון עד 100%', badge: 'מימון', icon: 'Sparkles', actionType: 'CALL_AGENT', highlightColor: '#8B5CF6' },
+      ],
+      recommendations: parsed.recommendations || [
+        'איזה רכבים יש במלאי?',
+        'איך מגיעים לסניף הרצליה?',
+        'איך מתאמים נסיעת מבחן?',
+        'מה תנאי המימון?'
+      ]
     });
   } catch (err: any) {
     console.error('Error in /api/ai/vector-assistant:', err);
 
-    // Fallback: rule-based semantic response with 4 recommendations and direct action links
-    const normalizedQuery = query.toLowerCase().trim();
-    let bestAction = SYSTEM_KNOWLEDGE_BASE[0];
-    if (normalizedQuery.includes('מותג') || normalizedQuery.includes('מיתוג') || normalizedQuery.includes('קול')) {
-      bestAction = SYSTEM_KNOWLEDGE_BASE[1];
-    } else if (normalizedQuery.includes('קליטה') || normalizedQuery.includes('רעיון') || normalizedQuery.includes('קול')) {
-      bestAction = SYSTEM_KNOWLEDGE_BASE[2];
-    } else if (normalizedQuery.includes('ערב') || normalizedQuery.includes('לילה')) {
-      bestAction = SYSTEM_KNOWLEDGE_BASE[4];
-    }
-
     return res.json({
-      reply: `על פי מתודת KOSUN, הצגנו עבורך את המידע והאפשרות לביצוע מיידי ללא הסחות דעת עבור: "${query.slice(0, 40)}"`,
-      actionLinks: [
-        {
-          id: bestAction.id,
-          label: bestAction.title,
-          description: bestAction.description,
-          targetScreen: bestAction.targetScreen,
-          targetAction: bestAction.targetAction,
-          icon: bestAction.icon,
-        },
+      reply: `מענה KOSAI עבור: "${query}"`,
+      layout: 'grid_2x2',
+      cards: [
+        { id: '1', title: 'רכבי ספורט במלאי', subtitle: 'M4, טייקאן, G63 ו-RS6', badge: 'מלאי מיידי', icon: 'Car', actionType: 'DRILL_DOWN_PRODUCT', highlightColor: '#00F0FF' },
+        { id: '2', title: 'נסיעת מבחן מלווה', subtitle: 'חוויית נהיגה אישית של 45 דק׳', badge: 'מומלץ', icon: 'KeyRound', actionType: 'BOOK_TEST_DRIVE', highlightColor: '#F59E0B' },
+        { id: '3', title: 'הגעה לאולם התצוגה', subtitle: 'רחוב המלאכה 12, הרצליה פיתוח', badge: 'סניף מרכזי', icon: 'MapPin', actionType: 'OPEN_ADDRESS', highlightColor: '#10B981' },
+        { id: '4', title: 'שיחה ישירה עם דורון', subtitle: 'מענה מקצועי וליווי ברכישה', badge: 'סוכן אישי', icon: 'Sparkles', actionType: 'CALL_AGENT', highlightColor: '#8B5CF6' }
       ],
       recommendations: [
-        '🎯 מעבר ל-3 משימות המיקוד',
-        '🎨 גילוי DNA המותג KOSUN',
-        '⚡ קליטה מהירה של קושאן',
-        '🌙 התחלת טקס סגירת יום',
-      ],
-      matchedDataSummary: 'סונכרן מקומית',
+        'צפייה במלאי הרכבים',
+        'כתובת ושעות פתיחה',
+        'תיאום נסיעת מבחן',
+        'שיחה עם יועץ רכב'
+      ]
     });
   }
 });

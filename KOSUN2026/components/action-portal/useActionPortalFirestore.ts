@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { collection, onSnapshot, query, orderBy, where, DocumentData } from 'firebase/firestore';
 import { db } from '../../../src/lib/firebase';
-import { ActionPortalItem } from '../types';
+import { ActionPortalItem } from './types';
 
 export interface ActionPortalFieldMapping {
   titleField?: string;

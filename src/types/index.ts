@@ -50,7 +50,7 @@ export interface BrainstormSession {
   updatedAt?: string;
 }
 
-export type ActiveScreen = 'home' | 'today' | 'inbox' | 'decompose' | 'brainstorm' | 'ritual' | 'branding' | 'viewcompona';
+export type ActiveScreen = 'home' | 'today' | 'inbox' | 'decompose' | 'brainstorm' | 'ritual' | 'branding' | 'viewcompona' | 'kos26' | 'kostest' | 'koswebai' | 'themelab';
 
 export interface AppState {
   todayTasks: Task[];
