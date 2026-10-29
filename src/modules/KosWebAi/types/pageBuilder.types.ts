@@ -302,6 +302,19 @@ export type PageCategory =
   | 'youtube_post'
   | 'general';
 
+export const ARCHIVE_SLUG_MAP: Record<string, PageCategory> = {
+  kosvidio: 'youtube_post',
+  kosinfo: 'info_content',
+  kosevent: 'event',
+  koscheckout: 'checkout',
+  koscommunity: 'community',
+  kosfunrise: 'fundraising',
+  koscourse: 'course',
+  kosass: 'service_product',
+  p: 'general',
+  posts: 'general',
+};
+
 export interface PageCategoryConfig {
   key: PageCategory;
   slugPrefix: string;

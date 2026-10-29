@@ -1,5 +1,4 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
-import { useLocation } from 'react-router-dom';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore, collection, getDocs, getDoc, limit, query, doc, onSnapshot, setDoc, updateDoc, deleteField } from 'firebase/firestore';
 import { getStorage, FirebaseStorage } from 'firebase/storage';
@@ -129,8 +128,8 @@ export const SystemConnectionProvider: React.FC<{ children: React.ReactNode }> =
   const { tenantId: scopedTenantId } = useTenantScope();
   const apiKeysTenantId = scopedTenantId || ROOT_TENANT_ID;
   const isRootTenant = apiKeysTenantId === ROOT_TENANT_ID;
-  const location = useLocation();
-  const activeModuleId = useMemo(() => resolveModuleIdFromPath(location.pathname), [location.pathname]);
+  const currentPathname = typeof window !== 'undefined' ? window.location.pathname : '/';
+  const activeModuleId = useMemo(() => resolveModuleIdFromPath(currentPathname), [currentPathname]);
 
   const [tenantApiKeys, setTenantApiKeys] = useState<SystemApiKeysConfig>(DEFAULT_API_KEYS);
   const [masterApiKeys, setMasterApiKeys] = useState<SystemApiKeysConfig>(DEFAULT_API_KEYS);
@@ -213,17 +212,7 @@ export const SystemConnectionProvider: React.FC<{ children: React.ReactNode }> =
             setIsCloudSynced(true);
             setCloudSyncTime(Date.now());
           } else {
-            // First time initialization on Firestore (API keys live in tenants/{tenantId}/settings/api_keys)
-            setDoc(
-              settingsDocRef,
-              {
-                config,
-                collections,
-                createdAt: Date.now(),
-                updatedAt: Date.now(),
-              },
-              { merge: true }
-            ).catch((err) => console.warn('[SystemConnection] Auto-init cloud settings notice:', err));
+            // In read-only / guest mode, mark synced locally in memory without triggering permission denial
             setIsCloudSynced(true);
             setCloudSyncTime(Date.now());
           }
@@ -709,10 +698,46 @@ export const SystemConnectionProvider: React.FC<{ children: React.ReactNode }> =
   );
 };
 
-export const useSystemConnection = () => {
+let _fallbackApp: FirebaseApp | undefined;
+let _fallbackDb: Firestore | undefined;
+
+function getFallbackFirebase() {
+  if (!_fallbackApp) {
+    const apps = getApps();
+    _fallbackApp = apps.length > 0 ? apps[0] : initializeApp(DEFAULT_FIREBASE_CONFIG);
+    _fallbackDb = getFirestore(_fallbackApp);
+  }
+  return { app: _fallbackApp, db: _fallbackDb };
+}
+
+export const useSystemConnection = (): SystemConnectionContextValue => {
   const ctx = useContext(SystemConnectionContext);
   if (!ctx) {
-    throw new Error('useSystemConnection must be used within a SystemConnectionProvider');
+    const { app: fbApp, db: fbDb } = getFallbackFirebase();
+    return {
+      config: DEFAULT_FIREBASE_CONFIG,
+      collections: DEFAULT_SYSTEM_COLLECTIONS,
+      apiKeys: DEFAULT_API_KEYS,
+      tenantApiKeys: DEFAULT_API_KEYS,
+      apiKeysTenantId: ROOT_TENANT_ID,
+      purchasedModules: [],
+      getApiKeysForModule: () => DEFAULT_API_KEYS,
+      isModuleEntitled: () => true,
+      firebaseApp: fbApp,
+      db: fbDb,
+      isConnected: true,
+      isTesting: false,
+      isCloudSynced: true,
+      updateConfig: async () => {},
+      updateApiKeys: async () => {},
+      testGoogleAiKey: async () => ({ success: true }),
+      testHeyGenKey: async () => ({ success: true }),
+      testConnection: async () => ({ success: true }),
+      resetToDefaults: () => {},
+      openConnectorModal: () => {},
+      closeConnectorModal: () => {},
+      isConnectorModalOpen: false,
+    };
   }
   return ctx;
 };

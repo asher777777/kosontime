@@ -97,6 +97,15 @@ export interface ArchetypeAiPersona {
   promptInstructions: string;
 }
 
+// 10. שידוך מדיה ישיר לקולקציית עיצוב התבניות מתוך KosCloudStore
+export interface ArchetypeMediaConfig {
+  heroImageUrl: string;
+  heroVideoUrl?: string;
+  thumbnailUrl?: string;
+  galleryFolderId?: string;
+  mediaItemId?: string;
+}
+
 // המבנה הכולל של מסמך Preset בפיירסטור
 export interface ArchetypePreset {
   id: string;
@@ -108,6 +117,7 @@ export interface ArchetypePreset {
   defaultLayout: LayoutPreset;
   style: ArchetypeStyleConfig;
   copy: ArchetypeCopyConfig;
+  media?: ArchetypeMediaConfig;
   inputMode: ArchetypeInputMode;
   outputMode: ArchetypeOutputMode;
   itemSchema?: ArchetypeFieldSchema[];

@@ -46,6 +46,16 @@ export const KosTestSite: React.FC<KosTestSiteProps> = ({ onBackToApp }) => {
           <span>Theme Lab • מעבדת מיתוג</span>
         </button>
 
+        {/* כפתור גישה ישירה ל-KosCloudStore */}
+        <button
+          onClick={() => { window.location.href = '#cloudstore'; }}
+          className="absolute -top-10 left-1/2 -translate-x-1/2 z-30 px-3 py-1 rounded-full bg-blue-950/70 hover:bg-blue-900 border border-blue-500/40 text-blue-300 text-[11px] font-bold shadow-lg flex items-center gap-1.5 transition-all cursor-pointer backdrop-blur-md active:scale-95"
+          title="פתיחת מודול KosCloudStore"
+        >
+          <Icons.Cloud size={12} className="text-blue-400" />
+          <span>KosCloudStore • מדיה</span>
+        </button>
+
         <KosCognitivePortal 
           tenantId="kosun" 
           targetProject="comona" 

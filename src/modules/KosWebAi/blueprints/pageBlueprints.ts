@@ -2,6 +2,7 @@ import { PageBuilderConfig } from '../types/pageBuilder.types';
 import { PageTemplateBlueprint } from '../types';
 import { SECTION_REGISTRY } from '../registry/sectionRegistry';
 import { hydrateSectionWithBrandDna } from '../services/brandSectionHydrator';
+import { setBlueprintsProvider } from '../services/pageBuilderFirestore';
 
 /**
  * 6 Core Archive Blueprints (7 אזורים לכל ארכיון) + Specialized Blueprints
@@ -1007,3 +1008,6 @@ export function hydrateBlueprintWithBrandDna(
 
   return cloned;
 }
+
+// Auto-register blueprints provider with pageBuilderFirestore to break circular dependency
+setBlueprintsProvider(getPageBlueprints);

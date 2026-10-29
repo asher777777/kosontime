@@ -23,6 +23,7 @@ import { subscribeToAuth } from '../../../services/firebaseAuth';
 import { useTenantScope } from '../../../core/tenant';
 import { SYSTEM_COLLECTIONS } from '../../../core/contracts';
 import { getModuleApiKeys } from '../../../core/connection/tenantApiKeys';
+import { SHARED_TEMPLATES_FOLDER, SHARED_TEMPLATES_FOLDER_ID } from '../services/archetypeMediaStreamService';
 
 export const isHeyGenItem = (item?: MediaItem | null): boolean => {
   if (!item) return false;
@@ -237,14 +238,17 @@ export const MediaGalleryProvider: React.FC<{
   }), [customCollections, getScopedCollectionPath]);
 
   const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-  const [folders, setFolders] = useState<MediaFolder[]>([{
+  const [folders, setFolders] = useState<MediaFolder[]>([
+    SHARED_TEMPLATES_FOLDER,
+    {
       id: 'folder_shapes_and_symbols',
       name: 'צורות וסמלים',
       color: '#f59e0b',
       icon: 'sparkles',
       itemCount: 15,
       createdAt: Date.now() - 100000,
-    }]);
+    },
+  ]);
   const [activeFolderId, setActiveFolderId] = useState<string | null>(defaultFolderId);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [previewItem, setPreviewItem] = useState<MediaItem | null>(null);
@@ -293,8 +297,11 @@ export const MediaGalleryProvider: React.FC<{
   const [isTextEditorOpen, setIsTextEditorOpen] = useState(false);
   const [docToLandingItem, setDocToLandingItem] = useState<MediaItem | null>(null);
 
-  const openImageEditor = (item: MediaItem) => setImageEditorItem(item);
-  const closeImageEditor = () => setImageEditorItem(null);
+  const openImageEditor = (item: MediaItem) => setConverterItem(item);
+  const closeImageEditor = () => {
+    setImageEditorItem(null);
+    setConverterItem(null);
+  };
 
   const openDocViewer = (item: MediaItem) => setDocViewerItem(item);
   const closeDocViewer = () => setDocViewerItem(null);
@@ -665,11 +672,11 @@ export const MediaGalleryProvider: React.FC<{
             // Sub-tenants: fetch tenant folders + shared folders from master
             try {
               const masterFolders = await FirestoreMediaService.fetchFolders(db, {
-                mediaItems: 'sdo_media_items',
-                folders: 'sdo_media_folders',
+                mediaItems: 'tenants/_master/sdo_media_items',
+                folders: 'tenants/_master/sdo_media_folders',
               });
               const sharedMasterFolders = masterFolders.filter((f) => f.isShared === true);
-              const combinedFolders = [...remoteFolders];
+              const combinedFolders = [SHARED_TEMPLATES_FOLDER, ...remoteFolders];
               sharedMasterFolders.forEach((sf) => {
                 if (!combinedFolders.some((f) => f.id === sf.id)) {
                   combinedFolders.push(sf);
@@ -677,30 +684,31 @@ export const MediaGalleryProvider: React.FC<{
               });
 
               // Also fetch items inside shared folders from master
-              if (sharedMasterFolders.length > 0) {
-                const masterItems = await FirestoreMediaService.fetchMediaItems(db, {
-                  mediaItems: 'sdo_media_items',
-                  folders: 'sdo_media_folders',
-                });
-                const sharedFolderIds = new Set(sharedMasterFolders.map((f) => f.id));
-                masterItems.forEach((mItem) => {
-                  if (
-                    (mItem.folderId && sharedFolderIds.has(mItem.folderId)) ||
-                    mItem.isShared === true ||
-                    mItem.metadata?.isShared === true
-                  ) {
-                    addDeduplicated({ ...mItem, isShared: true });
-                  }
-                });
-              }
+              const masterItems = await FirestoreMediaService.fetchMediaItems(db, {
+                mediaItems: 'tenants/_master/sdo_media_items',
+                folders: 'tenants/_master/sdo_media_folders',
+              });
+              const sharedFolderIds = new Set(combinedFolders.filter((f) => f.isShared).map((f) => f.id));
+              sharedFolderIds.add(SHARED_TEMPLATES_FOLDER_ID);
+
+              masterItems.forEach((mItem) => {
+                if (
+                  (mItem.folderId && sharedFolderIds.has(mItem.folderId)) ||
+                  mItem.isShared === true ||
+                  mItem.metadata?.isShared === true ||
+                  mItem.folderId === SHARED_TEMPLATES_FOLDER_ID
+                ) {
+                  addDeduplicated({ ...mItem, isShared: true });
+                }
+              });
 
               if (isMounted) {
                 setFolders(combinedFolders);
               }
             } catch (sharedErr) {
               console.warn('[MediaGallery] Error loading shared master folders for tenant:', sharedErr);
-              if (isMounted && remoteFolders.length > 0) {
-                setFolders(remoteFolders);
+              if (isMounted) {
+                setFolders([SHARED_TEMPLATES_FOLDER, ...remoteFolders]);
               }
             }
           } else if (isMounted && remoteFolders.length > 0) {
@@ -955,16 +963,19 @@ export const MediaGalleryProvider: React.FC<{
             },
           };
           await FirestoreMediaService.saveMediaItem(db, collections, finalItem);
-          // ONLY for _master root tenant backward compatibility:
-          if (tenantId === '_master' && collections.mediaItems !== 'sdo_media_items') {
+        } catch (fsErr) {
+          console.warn('[MediaGallery] Firestore save notice:', fsErr);
+        }
+
+        // ONLY for _master root tenant backward compatibility (silently catch unauthenticated root restrictions):
+        if (tenantId === '_master' && collections.mediaItems !== 'sdo_media_items') {
+          try {
             await FirestoreMediaService.saveMediaItem(
               db,
               { mediaItems: 'sdo_media_items', folders: 'sdo_media_folders' },
               finalItem
             );
-          }
-        } catch (fsErr) {
-          console.warn('[MediaGallery] Firestore save notice:', fsErr);
+          } catch {}
         }
       }
 

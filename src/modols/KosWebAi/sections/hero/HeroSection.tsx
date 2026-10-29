@@ -46,12 +46,13 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ config, onCtaAction })
   const effectivePrimaryBtnText = primaryButton?.text || themeCopy.ctaPrimary || 'התחל עכשיו';
   const effectiveSecondaryBtnText = secondaryButton?.text || themeCopy.ctaSecondary;
 
-  // 3. מדיה נקייה: תמונה נשלפת מהקונפיג או בהזרמה חיה מ-KosCloudStore
-  const effectiveImageSrc = imageSrc || heroImageUrl;
+  // 3. מדיה נקייה ומאובטחת: קונפיגורציית אזור -> שידוך מקולקציית עיצוב התבניות (archetype_presets) -> הזרמה מ-KosCloudStore
+  const archetypeMedia = activeArchetype.media;
+  const effectiveImageSrc = imageSrc || archetypeMedia?.heroImageUrl || heroImageUrl;
   const safeImageSrc = resolveSafeMediaUrl(effectiveImageSrc);
 
-  // וידאו רקע: נשלף מהקונפיג או בהזרמה חיה מ-KosCloudStore
-  const effectiveVideoUrl = videoBgUrl || (mediaType === 'video' ? heroVideoUrl : '');
+  // וידאו רקע: נשלף מהקונפיג או מקולקציית התבנית או בהזרמה חיה מ-KosCloudStore
+  const effectiveVideoUrl = videoBgUrl || (mediaType === 'video' ? (archetypeMedia?.heroVideoUrl || heroVideoUrl) : '');
   const isVideoActive = Boolean(effectiveVideoUrl);
 
   // 4. טוקני רדיוס ופונט

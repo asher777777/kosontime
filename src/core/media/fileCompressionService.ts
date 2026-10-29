@@ -145,7 +145,10 @@ export class FileCompressionService {
   ): Promise<{ blob: Blob; dataUrl: string; objectUrl: string; sizeBytes: number; width: number; height: number }> {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      const isLocalUrl = typeof source === 'string' && (source.startsWith('blob:') || source.startsWith('data:'));
+      if (!isLocalUrl && typeof source === 'string') {
+        img.crossOrigin = 'anonymous';
+      }
 
       img.onload = () => {
         let width = img.naturalWidth || img.width;
@@ -181,21 +184,42 @@ export class FileCompressionService {
           ctx.fillRect(0, 0, width, height);
         }
 
-        ctx.drawImage(img, 0, 0, width, height);
+        try {
+          ctx.drawImage(img, 0, 0, width, height);
+        } catch (drawErr) {
+          console.warn('[FileCompressionService] drawImage warning:', drawErr);
+        }
 
         const quality = options.quality ?? 0.85;
-        const dataUrl = canvas.toDataURL(options.targetFormat, quality);
+        let dataUrl = '';
+        try {
+          dataUrl = canvas.toDataURL(options.targetFormat, quality);
+        } catch (taintedErr) {
+          console.warn('[FileCompressionService] Canvas tainted, fallback to source url/blob:', taintedErr);
+        }
 
         canvas.toBlob(
           (blob) => {
             if (!blob) {
+              if (source instanceof Blob) {
+                const objectUrl = URL.createObjectURL(source);
+                resolve({
+                  blob: source,
+                  dataUrl,
+                  objectUrl,
+                  sizeBytes: source.size,
+                  width,
+                  height,
+                });
+                return;
+              }
               reject(new Error('Failed to convert image to Blob'));
               return;
             }
             const objectUrl = URL.createObjectURL(blob);
             resolve({
               blob,
-              dataUrl,
+              dataUrl: dataUrl || objectUrl,
               objectUrl,
               sizeBytes: blob.size,
               width,
@@ -207,7 +231,26 @@ export class FileCompressionService {
         );
       };
 
-      img.onerror = (err) => {
+      img.onerror = async (err) => {
+        // If crossOrigin failed on a remote URL, retry by fetching as Blob
+        if (typeof source === 'string' && img.crossOrigin) {
+          try {
+            console.log('[FileCompressionService] CrossOrigin error, falling back to fetch as Blob...');
+            const resp = await fetch(source);
+            if (resp.ok) {
+              const fetchedBlob = await resp.blob();
+              img.removeAttribute('crossOrigin');
+              img.src = URL.createObjectURL(fetchedBlob);
+              return;
+            }
+          } catch (fetchErr) {
+            console.warn('[FileCompressionService] Fallback fetch failed:', fetchErr);
+          }
+          // Final retry: remove crossOrigin completely
+          img.removeAttribute('crossOrigin');
+          img.src = source;
+          return;
+        }
         reject(new Error('Failed to load image for conversion: ' + err));
       };
 

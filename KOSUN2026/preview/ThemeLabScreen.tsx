@@ -9,19 +9,73 @@ import { HeroSectionConfig } from '../../src/modols/KosWebAi/types/sectionConfig
 import { pageBuilderFirestore } from '../../src/modols/KosWebAi/services/pageBuilderFirestore';
 import { PageBuilderConfig } from '../../src/modols/KosWebAi/types/pageBuilder.types';
 import { eventBus } from '@/core/bridge/EventBus';
+import { HostCapabilitiesProvider } from '@/core/bridge/HostCapabilitiesContext';
 import { SmartFormRunner } from '../../src/modols/KosForms/components/runner/SmartFormRunner';
 import { SMART_FORM_TEMPLATES } from '../../src/modols/KosForms/config/formTemplates';
+import { SystemConnectionProvider } from '@/core/connection/SystemConnectionContext';
+import { MediaPickerHostBridge } from '../../src/modols/KosCloudStore/components/MediaPickerHostBridge';
 
 interface ThemeLabScreenProps {
   onBackToApp?: () => void;
 }
 
 const RealLiveHeroLab: React.FC<ThemeLabScreenProps> = ({ onBackToApp }) => {
-  const { activeArchetype, activeId, setArchetypeById } = useArchetype();
+  const { activeArchetype, activeId, setArchetypeById, updateArchetypeMedia } = useArchetype();
+  const activeStyle = activeArchetype?.style || {
+    primaryColor: '#00F0FF',
+    secondaryColor: '#3a7bd5',
+    cardBg: '#18181b',
+    surfaceBg: '#09090b',
+    textPrimary: '#ffffff',
+    textSecondary: '#a1a1aa',
+  };
   const [deviceMode, setDeviceMode] = useState<'desktop' | 'mobile'>('mobile'); // Mobile-first כברירת מחדל!
   const [isRealEditorOpen, setIsRealEditorOpen] = useState(false);
   const [hostFormModalId, setHostFormModalId] = useState<string | null>(null);
   const [livePages, setLivePages] = useState<PageBuilderConfig[]>([]);
+
+  // ☁️ קריאה לחוזה של KosCloudStore דרך EventBus ללא ייבוא הדדי
+  const handleOpenCloudStorePicker = () => {
+    console.log('[ThemeLab] Emitting media:request_picker event to EventBus...');
+    eventBus.emit('media:request_picker', {
+      options: {
+        allowedTypes: ['image', 'video'],
+        multiple: false,
+        title: 'KosCloudStore • בחירת מדיה לשער (Hero)',
+      },
+      onSelect: (selectedUrl: string) => {
+        console.log('[ThemeLab Contract] Media received via EventBus:', selectedUrl);
+        if (!selectedUrl) return;
+        const isVideo = /\.(mp4|webm|mov)(\?.*)?$/i.test(selectedUrl);
+        setRealHeroConfig((prev) => ({
+          ...prev,
+          mediaType: isVideo ? 'video' : 'image',
+          imageSrc: isVideo ? prev.imageSrc : selectedUrl,
+          videoBgUrl: isVideo ? selectedUrl : prev.videoBgUrl,
+        }));
+
+        // 🔗 שידוך ישיר לקולקציית עיצוב התבניות (archetype_presets) בענן כברירת מחדל
+        updateArchetypeMedia(activeId, {
+          [isVideo ? 'heroVideoUrl' : 'heroImageUrl']: selectedUrl,
+          galleryFolderId: 'folder_shared_templates',
+        });
+      },
+    });
+  };
+
+  // ⚡ האזנה ל-hash בכתובת ה-URL: אם מופיע #cloudstore פותח מיד את המודאל ומנקה את ה-hash
+  useEffect(() => {
+    const checkHashAndOpen = () => {
+      if (window.location.hash.toLowerCase().includes('cloudstore')) {
+        console.log('[ThemeLab] Detected #cloudstore in hash! Opening picker modal...');
+        handleOpenCloudStorePicker();
+      }
+    };
+    // בדיקה ראשונית בעליית הקומפוננטה
+    checkHashAndOpen();
+    window.addEventListener('hashchange', checkHashAndOpen);
+    return () => window.removeEventListener('hashchange', checkHashAndOpen);
+  }, []);
 
   // האזנה לאירועי EventBus לפתיחת מודאל טפסים חכמים מכל אזור בעמוד
   useEffect(() => {
@@ -182,7 +236,7 @@ const RealLiveHeroLab: React.FC<ThemeLabScreenProps> = ({ onBackToApp }) => {
           )}
           <div>
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full animate-ping" style={{ backgroundColor: activeArchetype.style.primaryColor }} />
+              <span className="w-2.5 h-2.5 rounded-full animate-ping" style={{ backgroundColor: activeStyle.primaryColor }} />
               <h1 className="text-sm sm:text-base font-extrabold tracking-wide">
                 מעבדת שער חיה (Hero Mobile-First 2026)
               </h1>
@@ -209,7 +263,7 @@ const RealLiveHeroLab: React.FC<ThemeLabScreenProps> = ({ onBackToApp }) => {
                     : 'bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700'
                 }`}
                 style={{
-                  ringColor: isSelected ? activeArchetype.style.primaryColor : undefined,
+                  ringColor: isSelected ? activeStyle.primaryColor : undefined,
                 }}
               >
                 <Icon size={14} />
@@ -257,6 +311,17 @@ const RealLiveHeroLab: React.FC<ThemeLabScreenProps> = ({ onBackToApp }) => {
             <span>עורך שער</span>
           </button>
 
+          {/* כפתור פתיחת מודאל KosCloudStore דרך החוזה ב-EventBus */}
+          <button
+            type="button"
+            onClick={handleOpenCloudStorePicker}
+            className="px-3 py-1.5 rounded-xl text-xs font-bold bg-cyan-950/80 hover:bg-cyan-900 text-cyan-300 border border-cyan-500/50 flex items-center gap-1.5 transition-all shadow-sm active:scale-95 cursor-pointer"
+            title="פתיחת מודאל בורר המדיה מתוך KosCloudStore (מבוסס חוזה EventBus)"
+          >
+            <Icons.Cloud size={14} className="text-cyan-400" />
+            <span>KosCloudStore ☁️</span>
+          </button>
+
           {/* כפתור שמירה ב-Firestore */}
           <button
             type="button"
@@ -265,7 +330,7 @@ const RealLiveHeroLab: React.FC<ThemeLabScreenProps> = ({ onBackToApp }) => {
             className={`px-3.5 py-1.5 rounded-xl text-xs font-bold text-black flex items-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer ${
               saveSuccess ? 'bg-emerald-400 text-black' : ''
             }`}
-            style={{ backgroundColor: !saveSuccess ? activeArchetype.style.primaryColor : undefined }}
+            style={{ backgroundColor: !saveSuccess ? activeStyle.primaryColor : undefined }}
           >
             {isSaving ? (
               <Icons.Loader2 size={14} className="animate-spin" />
@@ -347,6 +412,17 @@ const RealLiveHeroLab: React.FC<ThemeLabScreenProps> = ({ onBackToApp }) => {
           >
             <Icons.Video size={13} />
             <span>וידאו רקע 🎥</span>
+          </button>
+
+          {/* כפתור פתיחת מודאל KosCloudStore דרך החוזה ב-EventBus */}
+          <button
+            type="button"
+            onClick={handleOpenCloudStorePicker}
+            className="px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white shadow-md cursor-pointer transition-all active:scale-95 ms-1"
+            title="פתיחת מודאל בורר המדיה מתוך KosCloudStore (עיון בתיקיות הארכיטיפים ובחירת מדיה)"
+          >
+            <Icons.FolderOpen size={13} />
+            <span>בחר מ-KosCloudStore ☁️</span>
           </button>
         </div>
 
@@ -455,9 +531,9 @@ const RealLiveHeroLab: React.FC<ThemeLabScreenProps> = ({ onBackToApp }) => {
           <div
             className="w-full max-w-md max-h-[92vh] border rounded-3xl shadow-2xl overflow-hidden flex flex-col relative"
             style={{
-              backgroundColor: activeArchetype.style.cardBg,
-              borderColor: `${activeArchetype.style.primaryColor}50`,
-              boxShadow: `0 20px 50px -10px ${activeArchetype.style.primaryColor}33`,
+              backgroundColor: activeStyle.cardBg,
+              borderColor: `${activeStyle.primaryColor}50`,
+              boxShadow: `0 20px 50px -10px ${activeStyle.primaryColor}33`,
             }}
           >
             <button
@@ -474,7 +550,7 @@ const RealLiveHeroLab: React.FC<ThemeLabScreenProps> = ({ onBackToApp }) => {
                   SMART_FORM_TEMPLATES.find((t) => t.id === hostFormModalId) ||
                   SMART_FORM_TEMPLATES[0]
                 }
-                submitButtonBgColor={activeArchetype.style.primaryColor}
+                submitButtonBgColor={activeStyle.primaryColor}
                 submitButtonTextColor="#FFFFFF"
                 submitButtonShape="rounded"
                 onComplete={(answers, submissionId) => {
@@ -488,14 +564,22 @@ const RealLiveHeroLab: React.FC<ThemeLabScreenProps> = ({ onBackToApp }) => {
           </div>
         </div>
       )}
+
+      {/* מודאלים מנוהלים בצורה חוזית דרך Host Bridges */}
     </div>
   );
 };
 
 export const ThemeLabScreen: React.FC<ThemeLabScreenProps> = (props) => {
   return (
-    <ArchetypeProvider initialArchetypeId="wellness">
-      <RealLiveHeroLab {...props} />
-    </ArchetypeProvider>
+    <SystemConnectionProvider>
+      <HostCapabilitiesProvider>
+        <ArchetypeProvider initialArchetypeId="wellness">
+          <RealLiveHeroLab {...props} />
+          {/* גשר המדיה של KosCloudStore - מאזין ל-EventBus ומספק את החוזה */}
+          <MediaPickerHostBridge />
+        </ArchetypeProvider>
+      </HostCapabilitiesProvider>
+    </SystemConnectionProvider>
   );
 };

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { TaskProvider, useTasks } from './context/TaskContext';
 import { ThemeProvider } from './context/ThemeContext';
@@ -25,6 +25,10 @@ import { ThemeLabScreen } from '../KOSUN2026/preview/ThemeLabScreen';
 import { Kos26Site } from '../KOSUN2026/Kos26Site';
 import { KosTestSite } from '../KOSUN2026/KosTestSite';
 import { KosWebAiPortalPage } from '../KOSUN2026/pages/KosWebAiPortalPage';
+import { KosCloudStoreStandaloneView } from './modols/KosCloudStore/StandaloneView';
+import { MediaPickerHostBridge } from './modols/KosCloudStore/components/MediaPickerHostBridge';
+import { HostCapabilitiesProvider } from './core/bridge/HostCapabilitiesContext';
+import { SystemConnectionProvider } from './core/connection/SystemConnectionContext';
 import { BrandProvider } from './context/BrandContext';
 import { KosunAiAssistantModal } from './components/KosunAiAssistantModal';
 import { KosunAiAvatarButton } from './components/KosunAiAvatarButton';
@@ -39,6 +43,9 @@ function MainApp() {
       const search = window.location.search.toLowerCase();
       if (path.includes('themelab') || hash.includes('themelab') || search.includes('themelab') || path.includes('lab') || hash.includes('lab')) {
         return 'themelab';
+      }
+      if (path.includes('cloudstore') || hash.includes('cloudstore') || search.includes('cloudstore')) {
+        return 'cloudstore';
       }
       if (path.includes('kosweb') || hash.includes('kosweb') || search.includes('kosweb')) {
         return 'koswebai';
@@ -61,8 +68,42 @@ function MainApp() {
   };
   const [activeScreen, setActiveScreen] = useState<ActiveScreen>(getInitialScreen);
 
+  useEffect(() => {
+    const handleHash = () => {
+      const hash = window.location.hash.toLowerCase();
+      const path = window.location.pathname.toLowerCase();
+      if (path.includes('themelab') || hash.includes('themelab')) {
+        setActiveScreen('themelab');
+      } else if (hash.includes('cloudstore') && !path.includes('themelab')) {
+        setActiveScreen('cloudstore');
+      } else if (hash.includes('kostest')) {
+        setActiveScreen('kostest');
+      }
+    };
+    window.addEventListener('hashchange', handleHash);
+    return () => window.removeEventListener('hashchange', handleHash);
+  }, []);
+
   if (activeScreen === 'themelab') {
     return <ThemeLabScreen onBackToApp={() => setActiveScreen('kostest')} />;
+  }
+  if (activeScreen === 'cloudstore') {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-white flex flex-col" dir="rtl">
+        <header className="p-3 bg-zinc-900 border-b border-zinc-800 flex items-center justify-between">
+          <button
+            onClick={() => setActiveScreen('themelab')}
+            className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-200 flex items-center gap-1.5 transition-colors cursor-pointer"
+          >
+            ← חזרה למעבדת המיתוג (ThemeLab)
+          </button>
+          <span className="font-bold text-sm text-cyan-400">☁️ KosCloudStore • מודול גלריית מדיה בענן</span>
+        </header>
+        <main className="flex-1 overflow-auto">
+          <KosCloudStoreStandaloneView />
+        </main>
+      </div>
+    );
   }
   if (activeScreen === 'koswebai') {
     return <KosWebAiPortalPage onBackToApp={() => setActiveScreen('kostest')} />;
@@ -368,13 +409,18 @@ function MainApp() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <BrandProvider>
-          <TaskProvider>
-            <MainApp />
-          </TaskProvider>
-        </BrandProvider>
-      </AuthProvider>
+      <SystemConnectionProvider>
+        <HostCapabilitiesProvider>
+          <AuthProvider>
+            <BrandProvider>
+              <TaskProvider>
+                <MainApp />
+                <MediaPickerHostBridge />
+              </TaskProvider>
+            </BrandProvider>
+          </AuthProvider>
+        </HostCapabilitiesProvider>
+      </SystemConnectionProvider>
     </ThemeProvider>
   );
 }

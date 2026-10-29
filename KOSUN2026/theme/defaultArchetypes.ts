@@ -48,6 +48,12 @@ export const DEFAULT_ARCHETYPES: Record<string, ArchetypePreset> = {
       contactSuccess: 'הפעולה נקלטה במערכת בהצלחה!',
       emptyStateText: 'אין מוצרים זמינים להצגה כרגע'
     },
+    media: {
+      heroImageUrl: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=1600&q=80',
+      heroVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-blue-and-purple-neon-lights-tunnel-loop-42861-large.mp4',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?auto=format&fit=crop&w=400&q=80',
+      galleryFolderId: 'folder_shared_templates',
+    },
     inputMode: {
       type: 'quick_contact',
       allowVoiceNote: true,
@@ -101,6 +107,12 @@ export const DEFAULT_ARCHETYPES: Record<string, ArchetypePreset> = {
       trustBadge: 'חיסיון עורך דין-לקוח מובטח על פי דין',
       contactSuccess: 'פנייתך התקבלה ונרשמה. צוות המשרד יצור עמך קשר בהקדם.',
       emptyStateText: 'לא נמצאו תיקים או שירותים להצגה'
+    },
+    media: {
+      heroImageUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=1600&q=80',
+      heroVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-aerial-view-of-city-traffic-at-night-4284-large.mp4',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?auto=format&fit=crop&w=400&q=80',
+      galleryFolderId: 'folder_shared_templates',
     },
     inputMode: {
       type: 'step_wizard',
@@ -159,6 +171,12 @@ export const DEFAULT_ARCHETYPES: Record<string, ArchetypePreset> = {
       contactSuccess: 'איזה כיף! שריינתי לך את הזמן, מחכה לראות אותך 💕',
       emptyStateText: 'הטיפולים יתעדכנו בקרוב...'
     },
+    media: {
+      heroImageUrl: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=1600&q=80',
+      heroVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-delicate-pink-rose-petals-falling-41318-large.mp4',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=400&q=80',
+      galleryFolderId: 'folder_shared_templates',
+    },
     inputMode: {
       type: 'calendar_picker',
       requirePhone: true,
@@ -215,6 +233,12 @@ export const DEFAULT_ARCHETYPES: Record<string, ArchetypePreset> = {
       contactSuccess: 'הבקשה אושרה! פרטי הגישה נשלחו אליך ישירות.',
       emptyStateText: 'אין פריטים פעילים במערכת'
     },
+    media: {
+      heroImageUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=1600&q=80',
+      heroVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-athlete-training-with-ropes-in-a-gym-42777-large.mp4',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1517838277536-f5f99be501cd?auto=format&fit=crop&w=400&q=80',
+      galleryFolderId: 'folder_shared_templates',
+    },
     inputMode: {
       type: 'quick_contact',
       requirePhone: true,
@@ -269,6 +293,12 @@ export const DEFAULT_ARCHETYPES: Record<string, ArchetypePreset> = {
       trustBadge: 'מרחב מוגן, בטוח ומכיל',
       contactSuccess: 'תודה על פנייתך. נשמח להיפגש בקרוב בשלווה.',
       emptyStateText: 'הסדנאות יפורסמו בהמשך'
+    },
+    media: {
+      heroImageUrl: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=1600&q=80',
+      heroVideoUrl: 'https://assets.mixkit.co/videos/preview/mixkit-tree-branches-in-the-breeze-1188-large.mp4',
+      thumbnailUrl: 'https://images.unsplash.com/photo-1506126613408-eca07ce68773?auto=format&fit=crop&w=400&q=80',
+      galleryFolderId: 'folder_shared_templates',
     },
     inputMode: {
       type: 'conversational_form',

@@ -26,6 +26,7 @@ export const MediaPickerHostBridge: React.FC<MediaPickerHostBridgeProps> = ({ fi
   } | null>(null);
 
   const openPicker = useCallback((opts?: MediaPickerOptions): Promise<string | string[] | null> => {
+    console.log('[MediaPickerHostBridge] openPicker called with opts:', opts);
     return new Promise((resolve) => {
       setOptions(opts);
       setResolver({ resolve });
@@ -51,14 +52,17 @@ export const MediaPickerHostBridge: React.FC<MediaPickerHostBridgeProps> = ({ fi
   }, [openPicker, registerCapability, unregisterCapability]);
 
   useEffect(() => {
+    console.log('[MediaPickerHostBridge] Subscribed to media:request_picker and cloud_store:request_picker');
     const unsubPicker = eventBus.subscribe('media:request_picker', async (payload: any) => {
-      const selected = await openPicker({ accept: 'image/*', multiple: false });
+      console.log('[MediaPickerHostBridge] Caught media:request_picker event! Payload:', payload);
+      const selected = await openPicker(payload?.options || { accept: '*/*', multiple: false });
       if (selected && typeof payload?.onSelect === 'function') {
         payload.onSelect(selected);
       }
     });
 
     const unsubCloudStore = (eventBus.subscribe as any)('cloud_store:request_picker', async (payload: any) => {
+      console.log('[MediaPickerHostBridge] Caught cloud_store:request_picker event! Payload:', payload);
       const selected = await openPicker(payload?.options || { accept: '*/*', multiple: false });
       if (selected && typeof payload?.onSelect === 'function') {
         payload.onSelect(selected);
@@ -149,7 +153,7 @@ export const MediaPickerHostBridge: React.FC<MediaPickerHostBridgeProps> = ({ fi
           <MediaPickerModal
             isOpen={true}
             onClose={handleClose}
-            allowedTypes={undefined}
+            allowedTypes={options?.allowedTypes || undefined}
             initialTab={options?.initialTab}
             maxSelectCount={options?.multiple ? options.maxFiles || 10 : 1}
             onSelectMedia={handleSelect}

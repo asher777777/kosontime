@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
-import { collection, onSnapshot, doc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore';
 import { db } from '../../src/lib/firebase'; // משיכה מהאינסטנס הקיים בפרויקט
-import { ArchetypePreset, ArchetypeId } from './types';
+import { ArchetypePreset, ArchetypeId, ArchetypeMediaConfig } from './types';
 import { DEFAULT_ARCHETYPES } from './defaultArchetypes';
 
 interface ArchetypeContextValue {
@@ -12,6 +12,8 @@ interface ArchetypeContextValue {
   setArchetypeById: (id: ArchetypeId) => void;
   // פונקציית עזר להלבשת דריסת עיצוב מקומית
   resolveTheme: (componentOverrides?: Partial<ArchetypePreset['style']>) => ArchetypePreset['style'];
+  // שידוך ושמירת מדיה ישירות לקולקציית עיצוב התבניות בענן
+  updateArchetypeMedia: (archId: ArchetypeId, mediaUpdates: Partial<ArchetypeMediaConfig>) => Promise<void>;
 }
 
 const ArchetypeContext = createContext<ArchetypeContextValue | undefined>(undefined);
@@ -41,9 +43,20 @@ export const ArchetypeProvider: React.FC<ArchetypeProviderProps> = ({
           if (!snapshot.empty) {
             const cloudPresets: Record<string, ArchetypePreset> = {};
             snapshot.forEach((docSnap) => {
-              cloudPresets[docSnap.id] = { id: docSnap.id, ...(docSnap.data() as any) };
+              const base = DEFAULT_ARCHETYPES[docSnap.id] || DEFAULT_ARCHETYPES.wellness;
+              const data = docSnap.data() as any;
+              cloudPresets[docSnap.id] = {
+                ...base,
+                ...data,
+                id: docSnap.id,
+                style: { ...(base.style || {}), ...(data.style || {}) },
+                copy: { ...(base.copy || {}), ...(data.copy || {}) },
+                backdrop: { ...(base.backdrop || {}), ...(data.backdrop || {}) },
+                motion: { ...(base.motion || {}), ...(data.motion || {}) },
+                media: { ...(base.media || {}), ...(data.media || {}) },
+              };
             });
-            // מיזוג: הענן מנצח ודורס את ברירות המחדל המקומיות, אך שומר על fallback
+            // מיזוג עמוק: ערכי ענן מועשרים בברירות מחדל מקומיות כדי למנוע undefined
             setAllPresets((prev) => ({ ...prev, ...cloudPresets }));
           }
           setIsLoading(false);
@@ -81,9 +94,17 @@ export const ArchetypeProvider: React.FC<ArchetypeProviderProps> = ({
     }
   }, [tenantId, allPresets]);
 
-  // הסגנון הפעיל כרגע
+  // הסגנון הפעיל כרגע - הגנה הרמטית עם Fallback ל-style, copy ו-media
   const activeArchetype = useMemo(() => {
-    return allPresets[activeId] || allPresets['wellness'] || DEFAULT_ARCHETYPES.wellness;
+    const candidate = allPresets[activeId] || allPresets['wellness'] || DEFAULT_ARCHETYPES.wellness;
+    const base = DEFAULT_ARCHETYPES[activeId] || DEFAULT_ARCHETYPES.wellness;
+    return {
+      ...base,
+      ...candidate,
+      style: { ...(base.style || {}), ...(candidate.style || {}) },
+      copy: { ...(base.copy || {}), ...(candidate.copy || {}) },
+      media: { ...(base.media || {}), ...(candidate.media || {}) },
+    };
   }, [allPresets, activeId]);
 
   // פונקציית מיזוג שדואגת שכל קומפוננטה תוכל לדרוס ערכים ב-Editor
@@ -95,13 +116,47 @@ export const ArchetypeProvider: React.FC<ArchetypeProviderProps> = ({
     };
   };
 
+  // שידוך ושמירת מדיה ישירות למסמך ה-Preset ב-Firestore (archetype_presets)
+  const updateArchetypeMedia = async (archId: ArchetypeId, mediaUpdates: Partial<ArchetypeMediaConfig>) => {
+    try {
+      const currentPreset = allPresets[archId] || DEFAULT_ARCHETYPES[archId] || DEFAULT_ARCHETYPES.wellness;
+      const updatedMedia: ArchetypeMediaConfig = {
+        heroImageUrl: currentPreset.media?.heroImageUrl || '',
+        heroVideoUrl: currentPreset.media?.heroVideoUrl || '',
+        galleryFolderId: 'folder_shared_templates',
+        ...(currentPreset.media || {}),
+        ...mediaUpdates,
+      };
+
+      // 1. עדכון מקומי מיידי
+      setAllPresets((prev) => ({
+        ...prev,
+        [archId]: {
+          ...(prev[archId] || currentPreset),
+          media: updatedMedia,
+          updatedAt: Date.now(),
+        },
+      }));
+
+      // 2. עדכון ב-Firestore בקולקציית archetype_presets
+      if (db) {
+        const docRef = doc(db, 'archetype_presets', archId);
+        await setDoc(docRef, { media: updatedMedia, updatedAt: Date.now() }, { merge: true });
+        console.log(`[ArchetypeEngine] Media successfully linked to archetype_presets/${archId} in cloud!`, updatedMedia);
+      }
+    } catch (err) {
+      console.warn('[ArchetypeEngine] Error linking media to archetype_presets:', err);
+    }
+  };
+
   const value: ArchetypeContextValue = {
     activeArchetype,
     activeId,
     allPresets,
     isLoading,
     setArchetypeById: setActiveId,
-    resolveTheme
+    resolveTheme,
+    updateArchetypeMedia,
   };
 
   return <ArchetypeContext.Provider value={value}>{children}</ArchetypeContext.Provider>;
@@ -118,7 +173,8 @@ export const useArchetype = () => {
       allPresets: DEFAULT_ARCHETYPES,
       isLoading: false,
       setArchetypeById: () => {},
-      resolveTheme: (overrides?: any) => ({ ...DEFAULT_ARCHETYPES.wellness.style, ...overrides })
+      resolveTheme: (overrides?: any) => ({ ...DEFAULT_ARCHETYPES.wellness.style, ...overrides }),
+      updateArchetypeMedia: async () => {},
     };
   }
   return context;

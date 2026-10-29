@@ -15,19 +15,22 @@ import { resolveMediaCollections } from './mediaCollections';
 import { resolveSafeMediaUrl, isAlienBlobUrl, getPermanentMediaUrl } from './mediaUrlSanitizer';
 
 export class FirestoreMediaService {
-  private static cleanUndefinedFields<T extends Record<string, any>>(obj: T): T {
-    const cleaned: Record<string, any> = {};
-    for (const key of Object.keys(obj)) {
-      const val = obj[key];
-      if (val !== undefined) {
-        if (val !== null && typeof val === 'object' && !Array.isArray(val)) {
-          cleaned[key] = this.cleanUndefinedFields(val);
-        } else {
-          cleaned[key] = val;
+  private static cleanUndefinedFields<T extends any>(obj: T): T {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.cleanUndefinedFields(item)) as unknown as T;
+    }
+    if (typeof obj === 'object') {
+      const cleaned: Record<string, any> = {};
+      for (const key of Object.keys(obj)) {
+        const val = (obj as any)[key];
+        if (val !== undefined) {
+          cleaned[key] = typeof val === 'object' && val !== null ? this.cleanUndefinedFields(val) : val;
         }
       }
+      return cleaned as T;
     }
-    return cleaned as T;
+    return obj;
   }
 
   static async fetchMediaItems(

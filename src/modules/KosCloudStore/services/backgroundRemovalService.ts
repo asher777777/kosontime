@@ -239,10 +239,29 @@ export class BackgroundRemovalService {
       }
 
       const img = new Image();
-      img.crossOrigin = 'anonymous';
+      const isLocal = typeof source === 'string' && (source.startsWith('blob:') || source.startsWith('data:'));
+      if (!isLocal && typeof source === 'string') {
+        img.crossOrigin = 'anonymous';
+      }
 
       img.onload = () => resolve(img);
-      img.onerror = (e) => reject(new Error('Failed to load image for background removal: ' + e));
+      img.onerror = async (e) => {
+        if (typeof source === 'string' && img.crossOrigin) {
+          try {
+            const resp = await fetch(source);
+            if (resp.ok) {
+              const b = await resp.blob();
+              img.removeAttribute('crossOrigin');
+              img.src = URL.createObjectURL(b);
+              return;
+            }
+          } catch {}
+          img.removeAttribute('crossOrigin');
+          img.src = source;
+          return;
+        }
+        reject(new Error('Failed to load image for background removal: ' + e));
+      };
 
       if (typeof source === 'string') {
         img.src = source;

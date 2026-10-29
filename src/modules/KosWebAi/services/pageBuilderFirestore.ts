@@ -4,8 +4,13 @@ import { PageBuilderConfig } from '../types/pageBuilder.types';
 import { ROOT_TENANT_ID } from '../../../core/tenant/tenantResolver';
 import { SYSTEM_COLLECTIONS } from '../../../core/contracts/collections';
 import { eventBus } from '../../../core/bridge/EventBus';
-import { getPageBlueprints } from '../blueprints/pageBlueprints';
 import { resolveLiveBrandDna, hydrateSectionWithBrandDna } from './brandSectionHydrator';
+
+// Provider function to avoid circular dependency with pageBlueprints and sectionRegistry
+let _blueprintsProvider: (() => any[]) | null = null;
+export function setBlueprintsProvider(provider: () => any[]) {
+  _blueprintsProvider = provider;
+}
 
 const DEFAULT_COLLECTION_NAME = SYSTEM_COLLECTIONS.PAGES; // 'kos_web_ai_documents'
 const LEGACY_COLLECTION_NAME = 'mod_pages_documents';
@@ -515,8 +520,8 @@ export const pageBuilderFirestore = {
   createDefaultRootHomePage(tenantId?: string): PageBuilderConfig {
     const eff = resolveEffectiveTenant(tenantId);
     const brand = resolveLiveBrandDna(null, eff);
-    const blueprints = getPageBlueprints();
-    const homepageBp = blueprints.find((b) => b.id === 'ecosystem-homepage');
+    const blueprints = _blueprintsProvider ? _blueprintsProvider() : [];
+    const homepageBp = blueprints.find((b: any) => b.id === 'ecosystem-homepage');
 
     if (homepageBp) {
       const clonedConfig: PageBuilderConfig = JSON.parse(JSON.stringify(homepageBp.config));

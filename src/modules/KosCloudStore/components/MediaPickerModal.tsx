@@ -384,6 +384,42 @@ const MediaPickerModalContent: React.FC<{
   );
 };
 
+class MediaPickerErrorBoundary extends React.Component<
+  { children: React.ReactNode; onClose: () => void },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('[MediaPickerModal] Render error:', error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 bg-zinc-900 border border-red-500/40 rounded-2xl max-w-lg text-center text-white space-y-4 shadow-2xl">
+          <h3 className="text-lg font-bold text-red-400">שגיאה בטעינת גלריית KosCloudStore</h3>
+          <p className="text-xs text-zinc-300 font-mono bg-black/60 p-3 rounded-lg overflow-auto max-h-40 text-start" dir="ltr">
+            {this.state.error?.message || String(this.state.error)}
+          </p>
+          <button
+            type="button"
+            onClick={this.props.onClose}
+            className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold cursor-pointer"
+          >
+            סגור חלון
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
   isOpen,
   onClose,
@@ -407,17 +443,19 @@ export const MediaPickerModal: React.FC<MediaPickerModalProps> = ({
       className="fixed inset-0 z-[300] flex items-center justify-center bg-black/90 backdrop-blur-md animate-fade-in text-slate-100"
       dir="rtl"
     >
-      <MediaGalleryProvider
-        config={{
-          ...restConfig,
-          selectionMode: true,
-          allowedTypes,
-          onSelectMedia: handleSelectAndClose,
-          onClosePicker: onClose,
-        }}
-      >
-        <MediaPickerModalContent title={title} onClose={onClose} initialTab={initialTab} />
-      </MediaGalleryProvider>
+      <MediaPickerErrorBoundary onClose={onClose}>
+        <MediaGalleryProvider
+          config={{
+            ...restConfig,
+            selectionMode: true,
+            allowedTypes,
+            onSelectMedia: handleSelectAndClose,
+            onClosePicker: onClose,
+          }}
+        >
+          <MediaPickerModalContent title={title} onClose={onClose} initialTab={initialTab} />
+        </MediaGalleryProvider>
+      </MediaPickerErrorBoundary>
     </div>
   );
 };

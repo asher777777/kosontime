@@ -2,13 +2,30 @@ import { Firestore, doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../../../lib/firebase';
 import { MediaItem, MediaFolder } from '../../../core/contracts';
 import { FirestoreMediaService } from './firestoreMediaService';
+import { DEFAULT_ARCHETYPES } from '../../../../KOSUN2026/theme/defaultArchetypes';
 import { useState, useEffect } from 'react';
+
+/**
+ * 🌟 תיקיית העל השיתופית לכל הטננטים עבור תבניות ועיצובים
+ */
+export const SHARED_TEMPLATES_FOLDER_ID = 'folder_shared_templates';
+
+export const SHARED_TEMPLATES_FOLDER: MediaFolder = {
+  id: SHARED_TEMPLATES_FOLDER_ID,
+  name: '🎨 תבניות ועיצובים (Shared Templates)',
+  color: '#00F0FF',
+  icon: 'Layers',
+  sourceModule: 'KosCloudStore',
+  isShared: true,
+  createdAt: 1700000000000,
+};
 
 /**
  * 📁 הגדרת תיקיות רשמיות ב-KosCloudStore לכל סגנון וארכיטיפ
  * נשמרות בקולקציית sdo_media_folders
  */
 export const ARCHETYPE_MEDIA_FOLDERS: Record<string, MediaFolder> = {
+  shared_templates: SHARED_TEMPLATES_FOLDER,
   wellness: {
     id: 'folder_arch_wellness',
     name: '🌿 מדיה - סגנון Wellness',
@@ -16,6 +33,7 @@ export const ARCHETYPE_MEDIA_FOLDERS: Record<string, MediaFolder> = {
     icon: 'Sparkles',
     sourceModule: 'KosCloudStore',
     isShared: true,
+    parentId: SHARED_TEMPLATES_FOLDER_ID,
     createdAt: 1700000000000,
   },
   lawyer: {
@@ -25,6 +43,7 @@ export const ARCHETYPE_MEDIA_FOLDERS: Record<string, MediaFolder> = {
     icon: 'Briefcase',
     sourceModule: 'KosCloudStore',
     isShared: true,
+    parentId: SHARED_TEMPLATES_FOLDER_ID,
     createdAt: 1700000000000,
   },
   feminine: {
@@ -34,6 +53,7 @@ export const ARCHETYPE_MEDIA_FOLDERS: Record<string, MediaFolder> = {
     icon: 'Heart',
     sourceModule: 'KosCloudStore',
     isShared: true,
+    parentId: SHARED_TEMPLATES_FOLDER_ID,
     createdAt: 1700000000000,
   },
   masculine: {
@@ -43,6 +63,7 @@ export const ARCHETYPE_MEDIA_FOLDERS: Record<string, MediaFolder> = {
     icon: 'Shield',
     sourceModule: 'KosCloudStore',
     isShared: true,
+    parentId: SHARED_TEMPLATES_FOLDER_ID,
     createdAt: 1700000000000,
   },
   kosun_portal: {
@@ -52,6 +73,7 @@ export const ARCHETYPE_MEDIA_FOLDERS: Record<string, MediaFolder> = {
     icon: 'Zap',
     sourceModule: 'KosCloudStore',
     isShared: true,
+    parentId: SHARED_TEMPLATES_FOLDER_ID,
     createdAt: 1700000000000,
   },
 };
@@ -194,35 +216,61 @@ export const ARCHETYPE_DEFAULT_MEDIA_ITEMS: Record<string, { image: MediaItem; v
 };
 
 /**
- * וידוא קיום תיקיות וקבצי מדיה ציבוריים ב-Firestore של KosCloudStore
+ * וידוא קיום תיקיות וקבצי מדיה שיתופיים ב-Firestore של KosCloudStore
+ * ושידוך אוטומטי של קבצי המדיה לקולקציית עיצוב התבניות (archetype_presets)
  */
-export async function seedArchetypeCloudStore(customDb?: Firestore): Promise<void> {
+export async function seedArchetypeCloudStore(customDb?: Firestore, tenantId: string = '_master'): Promise<void> {
   const targetDb = customDb || db;
   if (!targetDb) return;
 
+  const targetCollections = {
+    mediaItems: `tenants/${tenantId}/sdo_media_items`,
+    folders: `tenants/${tenantId}/sdo_media_folders`,
+  };
+
   try {
-    // 1. שמירת תיקיות הסגנונות
+    // 1. שמירת התיקייה השיתופית הראשית והתת-תיקיות
     for (const folder of Object.values(ARCHETYPE_MEDIA_FOLDERS)) {
       await FirestoreMediaService.saveFolder(
         targetDb,
-        { mediaItems: 'sdo_media_items', folders: 'sdo_media_folders' },
+        targetCollections,
         folder
       ).catch(() => {});
     }
 
-    // 2. שמירת קבצי המדיה הציבוריים
+    // 2. שמירת קבצי המדיה השיתופיים של התבניות
     for (const { image, video } of Object.values(ARCHETYPE_DEFAULT_MEDIA_ITEMS)) {
       await FirestoreMediaService.saveMediaItem(
         targetDb,
-        { mediaItems: 'sdo_media_items', folders: 'sdo_media_folders' },
-        image
+        targetCollections,
+        {
+          ...image,
+          folderId: SHARED_TEMPLATES_FOLDER_ID,
+          isShared: true,
+          tags: [...(image.tags || []), 'template_design', 'shared_template'],
+        }
       ).catch(() => {});
       await FirestoreMediaService.saveMediaItem(
         targetDb,
-        { mediaItems: 'sdo_media_items', folders: 'sdo_media_folders' },
-        video
+        targetCollections,
+        {
+          ...video,
+          folderId: SHARED_TEMPLATES_FOLDER_ID,
+          isShared: true,
+          tags: [...(video.tags || []), 'template_design', 'shared_template'],
+        }
       ).catch(() => {});
     }
+
+    // 3. שידוך קבצי המדיה וסנכרון תבנית מלאה לקולקציית עיצוב התבניות (archetype_presets) בענן
+    for (const [archId, preset] of Object.entries(DEFAULT_ARCHETYPES)) {
+      const presetDocRef = doc(targetDb, 'archetype_presets', archId);
+      await setDoc(presetDocRef, {
+        ...preset,
+        updatedAt: Date.now()
+      }, { merge: true }).catch(() => {});
+    }
+    console.log('[ArchetypeMediaStream] Seed completed: Shared templates folder & archetype presets linked.');
   } catch (err) {
     console.warn('[ArchetypeMediaStream] Seed error:', err);
   }
@@ -230,7 +278,7 @@ export async function seedArchetypeCloudStore(customDb?: Firestore): Promise<voi
 
 /**
  * ⚡ Hook להזרמת נתוני מדיה חיה מ-KosCloudStore לפי ארכיטיפ
- * מקשיב בזמן אמת ל-sdo_media_items ומסנן לפי תיקייה וארכיטיפ
+ * מקשיב בזמן אמת ל-tenants/_master/sdo_media_items ומסנן לפי תיקייה וארכיטיפ
  */
 export function useArchetypeMediaStream(archetypeId: string = 'wellness') {
   const [streamedItems, setStreamedItems] = useState<MediaItem[]>([]);
@@ -242,17 +290,17 @@ export function useArchetypeMediaStream(archetypeId: string = 'wellness') {
       return;
     }
 
-    // הפעלת seed ראשוני אם נדרש
+    // הפעלת seed ראשוני לווידוא קיום התיקייה השיתופית ושידוך המדיה
     seedArchetypeCloudStore(db).catch(() => {});
 
-    // הזרמה חיה מקולקציית sdo_media_items
+    // הזרמה חיה מקולקציית המדיה של המאסטר
     const unsubscribe = FirestoreMediaService.subscribeMediaItems(
       db,
       (allItems) => {
         setStreamedItems(allItems);
         setIsLoading(false);
       },
-      { mediaItems: 'sdo_media_items', folders: 'sdo_media_folders' }
+      { mediaItems: 'tenants/_master/sdo_media_items', folders: 'tenants/_master/sdo_media_folders' }
     );
 
     return () => unsubscribe();
@@ -261,16 +309,26 @@ export function useArchetypeMediaStream(archetypeId: string = 'wellness') {
   const targetFolderId = `folder_arch_${archetypeId}`;
   const fallbackPreset = ARCHETYPE_DEFAULT_MEDIA_ITEMS[archetypeId] || ARCHETYPE_DEFAULT_MEDIA_ITEMS.wellness;
 
-  // סינון פריטי המדיה השייכים לתיקיית הסגנון הנוכחי
+  // סינון פריטי המדיה השייכים לתיקיית הסגנון הנוכחי או לתיקייה השיתופית
   const folderItems = streamedItems.filter(
-    (item) => item.folderId === targetFolderId || item.tags?.includes(archetypeId)
+    (item) =>
+      item.folderId === targetFolderId ||
+      item.folderId === SHARED_TEMPLATES_FOLDER_ID ||
+      item.tags?.includes(archetypeId) ||
+      item.id.includes(archetypeId)
   );
 
   // חילוץ תמונת השער הפעילה
-  const heroImageItem = folderItems.find((i) => i.type === 'image') || fallbackPreset.image;
+  const heroImageItem =
+    folderItems.find((i) => i.type === 'image' && (i.tags?.includes(archetypeId) || i.id.includes(archetypeId))) ||
+    folderItems.find((i) => i.type === 'image') ||
+    fallbackPreset.image;
 
   // חילוץ וידאו הרקע הפעיל
-  const heroVideoItem = folderItems.find((i) => i.type === 'video') || fallbackPreset.video;
+  const heroVideoItem =
+    folderItems.find((i) => i.type === 'video' && (i.tags?.includes(archetypeId) || i.id.includes(archetypeId))) ||
+    folderItems.find((i) => i.type === 'video') ||
+    fallbackPreset.video;
 
   return {
     allItems: folderItems.length > 0 ? folderItems : [fallbackPreset.image, fallbackPreset.video],

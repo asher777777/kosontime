@@ -7,6 +7,24 @@ import { FileCompressionService } from './fileCompressionService';
 import { getTenantPublicMediaUrl } from './mediaUrlSanitizer';
 
 export class FirebaseStorageMediaService {
+  public static cleanUndefinedFields<T extends any>(obj: T): T {
+    if (obj === null || obj === undefined) return obj;
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.cleanUndefinedFields(item)) as unknown as T;
+    }
+    if (typeof obj === 'object') {
+      const cleaned: Record<string, any> = {};
+      for (const key of Object.keys(obj)) {
+        const val = (obj as any)[key];
+        if (val !== undefined) {
+          cleaned[key] = typeof val === 'object' && val !== null ? this.cleanUndefinedFields(val) : val;
+        }
+      }
+      return cleaned as T;
+    }
+    return obj;
+  }
+
   public static getStorageInstance(app: FirebaseApp) {
     try {
       const bucket = app.options.storageBucket || 'glowmanage.firebasestorage.app';
@@ -94,7 +112,7 @@ export class FirebaseStorageMediaService {
       const vaultDocRef = doc(db, vaultColl, `${timeStamp}_${safeName}`);
       const itemsDocRef = doc(db, itemsColl, localMediaItem.id);
       
-      const payload = {
+      const rawPayload = {
         ...localMediaItem,
         id: localMediaItem.id,
         name: safeName,
@@ -108,6 +126,7 @@ export class FirebaseStorageMediaService {
         storagePath,
         updatedAt: Date.now(),
       };
+      const payload = this.cleanUndefinedFields(rawPayload);
 
       setDoc(vaultDocRef, payload, { merge: true }).catch(() => {});
       setDoc(itemsDocRef, payload, { merge: true }).catch(() => {});
@@ -138,8 +157,9 @@ export class FirebaseStorageMediaService {
             const itemsColl = tenantId ? `tenants/${tenantId}/sdo_media_items` : 'sdo_media_items';
             const vaultDocRef = doc(db, vaultColl, `${timeStamp}_${safeName}`);
             const itemsDocRef = doc(db, itemsColl, localMediaItem.id);
-            setDoc(vaultDocRef, { url: finalUrl, thumbnailUrl: finalUrl, updatedAt: Date.now() }, { merge: true }).catch(() => {});
-            setDoc(itemsDocRef, { url: finalUrl, thumbnailUrl: finalUrl, updatedAt: Date.now() }, { merge: true }).catch(() => {});
+            const updatePayload = this.cleanUndefinedFields({ url: finalUrl, thumbnailUrl: finalUrl, updatedAt: Date.now() });
+            setDoc(vaultDocRef, updatePayload, { merge: true }).catch(() => {});
+            setDoc(itemsDocRef, updatePayload, { merge: true }).catch(() => {});
           } catch {}
         }
 
